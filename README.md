@@ -22,7 +22,7 @@ Add the following to your `Package.swift` file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/mattt/swift-yyjson.git", from: "0.1.0")
+    .package(url: "https://github.com/mattt/swift-yyjson.git", from: "0.2.0")
 ]
 ```
 
@@ -206,7 +206,7 @@ Customize the underlying yyjson library at compile time using package traits:
 ```swift
 .package(
     url: "https://github.com/mattt/swift-yyjson.git",
-    from: "0.1.0",
+    from: "0.2.0",
     traits: ["noWriter", "strictStandardJSON"]
 )
 ```
