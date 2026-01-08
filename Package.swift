@@ -73,12 +73,28 @@ let package = Package(
             name: "YYJSON",
             dependencies: ["Cyyjson"],
             swiftSettings: [
-                .enableUpcomingFeature("StrictConcurrency")
+                .enableUpcomingFeature("StrictConcurrency"),
+                .define("YYJSON_DISABLE_READER", .when(traits: ["noReader"])),
+                .define("YYJSON_DISABLE_WRITER", .when(traits: ["noWriter"])),
+                .define("YYJSON_DISABLE_INCR_READER", .when(traits: ["noIncrementalReader"])),
+                .define("YYJSON_DISABLE_UTILS", .when(traits: ["noUtilities"])),
+                .define("YYJSON_DISABLE_FAST_FP_CONV", .when(traits: ["noFastFloatingPoint"])),
+                .define("YYJSON_DISABLE_NON_STANDARD", .when(traits: ["strictStandardJSON"])),
+                .define("YYJSON_DISABLE_UTF8_VALIDATION", .when(traits: ["noUTF8Validation"])),
             ]
         ),
         .testTarget(
             name: "YYJSONTests",
-            dependencies: ["YYJSON"]
+            dependencies: ["YYJSON"],
+            swiftSettings: [
+                .define("YYJSON_DISABLE_READER", .when(traits: ["noReader"])),
+                .define("YYJSON_DISABLE_WRITER", .when(traits: ["noWriter"])),
+                .define("YYJSON_DISABLE_INCR_READER", .when(traits: ["noIncrementalReader"])),
+                .define("YYJSON_DISABLE_UTILS", .when(traits: ["noUtilities"])),
+                .define("YYJSON_DISABLE_FAST_FP_CONV", .when(traits: ["noFastFloatingPoint"])),
+                .define("YYJSON_DISABLE_NON_STANDARD", .when(traits: ["strictStandardJSON"])),
+                .define("YYJSON_DISABLE_UTF8_VALIDATION", .when(traits: ["noUTF8Validation"])),
+            ]
         ),
     ]
 )
