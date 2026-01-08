@@ -1,0 +1,5 @@
+module Cyyjson {
+    header "yyjson.h"
+    export *
+}
+
