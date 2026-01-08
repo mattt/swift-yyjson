@@ -200,6 +200,15 @@ By default, no traits are enabled —
 you get full functionality with all features and validations included.
 Enable traits only when you have specific size or performance requirements.
 
+> [!NOTE]
+> When traits are enabled,
+> the corresponding Swift APIs are conditionally compiled
+> and become unavailable at compile time.
+> For example, enabling the `noReader` trait makes unavailable
+> `YYJSONDecoder`, `YYJSONValue`, and `YYJSONSerialization.jsonObject(with:options:)`.
+> Similarly, enabling the `noWriter` trait makes unavailable
+> `YYJSONEncoder` and `YYJSONSerialization.data(withJSONObject:options:)`.
+
 ### `noReader`
 
 Disables JSON reader functionality at compile-time
@@ -207,12 +216,23 @@ Disables JSON reader functionality at compile-time
 **Reduces binary size by about 60%.**
 Use this if your application only needs to write JSON, not parse it.
 
+When this trait is enabled, the following APIs become unavailable:
+
+- `YYJSONDecoder`
+- `YYJSONValue`, `YYJSONObject`, `YYJSONArray`
+- `YYJSONSerialization.jsonObject(with:options:)`
+
 ### `noWriter`
 
 Disables JSON writer functionality at compile-time
 (functions with "write" in their name).
 **Reduces binary size by about 30%.**
 Use this if your application only needs to parse JSON, not generate it.
+
+When this trait is enabled, the following APIs become unavailable:
+
+- `YYJSONEncoder`
+- `YYJSONSerialization.data(withJSONObject:options:)`
 
 ### `noIncrementalReader`
 

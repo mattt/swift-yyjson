@@ -57,30 +57,32 @@ public enum YYJSONSerialization {
     ///   - options: Options for reading the JSON.
     /// - Returns: A Foundation object (NSArray, NSDictionary, NSString, NSNumber, or NSNull).
     /// - Throws: `YYJSONError` if parsing fails.
-    public static func jsonObject(with data: Data, options: ReadingOptions = []) throws -> Any {
-        var readOptions: YYJSONReadOptions = .default
-        if options.contains(.json5Allowed) {
-            readOptions.insert(.json5)
+    #if !YYJSON_DISABLE_READER
+        public static func jsonObject(with data: Data, options: ReadingOptions = []) throws -> Any {
+            var readOptions: YYJSONReadOptions = .default
+            if options.contains(.json5Allowed) {
+                readOptions.insert(.json5)
+            }
+
+            let document = try YYDocument(data: data, options: readOptions)
+            guard let root = document.root else {
+                throw YYJSONError.invalidData("Document has no root value")
+            }
+
+            let value = YYJSONValue(value: root, document: document)
+            let result = try value.toFoundationObject(options: options)
+
+            if options.contains(.fragmentsAllowed) {
+                return result
+            }
+
+            if result is NSArray || result is NSDictionary {
+                return result
+            }
+
+            throw YYJSONError.invalidData("Top-level JSON value must be an array or dictionary")
         }
-
-        let document = try YYDocument(data: data, options: readOptions)
-        guard let root = document.root else {
-            throw YYJSONError.invalidData("Document has no root value")
-        }
-
-        let value = YYJSONValue(value: root, document: document)
-        let result = try value.toFoundationObject(options: options)
-
-        if options.contains(.fragmentsAllowed) {
-            return result
-        }
-
-        if result is NSArray || result is NSDictionary {
-            return result
-        }
-
-        throw YYJSONError.invalidData("Top-level JSON value must be an array or dictionary")
-    }
+    #endif  // !YYJSON_DISABLE_READER
 
     /// Returns JSON data from a Foundation object.
     /// - Parameters:
@@ -88,53 +90,55 @@ public enum YYJSONSerialization {
     ///   - options: Options for writing the JSON.
     /// - Returns: The JSON data.
     /// - Throws: `YYJSONError` if conversion fails.
-    public static func data(withJSONObject obj: Any, options: WritingOptions = []) throws -> Data {
-        let isTopLevelContainer = obj is NSArray || obj is NSDictionary
-        let isFragment = obj is NSString || obj is NSNumber || obj is NSNull
+    #if !YYJSON_DISABLE_WRITER
+        public static func data(withJSONObject obj: Any, options: WritingOptions = []) throws -> Data {
+            let isTopLevelContainer = obj is NSArray || obj is NSDictionary
+            let isFragment = obj is NSString || obj is NSNumber || obj is NSNull
 
-        if isTopLevelContainer {
-            guard isValidJSONObject(obj) else {
+            if isTopLevelContainer {
+                guard isValidJSONObject(obj) else {
+                    throw YYJSONError.invalidData("Invalid JSON object")
+                }
+            } else if isFragment {
+                guard options.contains(.fragmentsAllowed) else {
+                    throw YYJSONError.invalidData("Top-level JSON value must be an array or dictionary")
+                }
+            } else {
                 throw YYJSONError.invalidData("Invalid JSON object")
             }
-        } else if isFragment {
-            guard options.contains(.fragmentsAllowed) else {
-                throw YYJSONError.invalidData("Top-level JSON value must be an array or dictionary")
+
+            guard let doc = yyjson_mut_doc_new(nil) else {
+                throw YYJSONError.invalidData("Failed to create document")
             }
-        } else {
-            throw YYJSONError.invalidData("Invalid JSON object")
-        }
+            defer {
+                yyjson_mut_doc_free(doc)
+            }
 
-        guard let doc = yyjson_mut_doc_new(nil) else {
-            throw YYJSONError.invalidData("Failed to create document")
-        }
-        defer {
-            yyjson_mut_doc_free(doc)
-        }
+            let root = try foundationObjectToYYJSON(obj, doc: doc, options: options)
+            yyjson_mut_doc_set_root(doc, root)
 
-        let root = try foundationObjectToYYJSON(obj, doc: doc, options: options)
-        yyjson_mut_doc_set_root(doc, root)
+            var flags: yyjson_write_flag = 0
+            if options.contains(.prettyPrinted) {
+                flags |= YYJSON_WRITE_PRETTY
+            }
+            if !options.contains(.withoutEscapingSlashes) {
+                flags |= YYJSON_WRITE_ESCAPE_SLASHES
+            }
 
-        var flags: yyjson_write_flag = 0
-        if options.contains(.prettyPrinted) {
-            flags |= YYJSON_WRITE_PRETTY
+            var error = yyjson_write_err()
+            var length: size_t = 0
+
+            guard let jsonString = yyjson_mut_val_write_opts(root, flags, nil, &length, &error) else {
+                throw YYJSONError(writing: error)
+            }
+
+            defer {
+                free(jsonString)
+            }
+
+            return Data(bytes: jsonString, count: length)
         }
-        if !options.contains(.withoutEscapingSlashes) {
-            flags |= YYJSON_WRITE_ESCAPE_SLASHES
-        }
-
-        var error = yyjson_write_err()
-        var length: size_t = 0
-
-        guard let jsonString = yyjson_mut_val_write_opts(root, flags, nil, &length, &error) else {
-            throw YYJSONError(writing: error)
-        }
-
-        defer {
-            free(jsonString)
-        }
-
-        return Data(bytes: jsonString, count: length)
-    }
+    #endif  // !YYJSON_DISABLE_WRITER
 
     /// Returns a Boolean value that indicates whether the serializer can convert a given object to JSON data.
     /// - Parameter obj: The object to validate.
@@ -266,68 +270,72 @@ public enum YYJSONSerialization {
 
 // MARK: - YYJSONValue to Foundation Conversion
 
-extension YYJSONValue {
-    fileprivate func toFoundationObject(options: YYJSONSerialization.ReadingOptions) throws -> Any {
-        if isNull {
-            return NSNull()
-        }
+#if !YYJSON_DISABLE_READER
 
-        if let b = bool {
-            return NSNumber(value: b)
-        }
-
-        if let n = number {
-            if n.truncatingRemainder(dividingBy: 1) == 0 {
-                if n >= Double(Int64.min) && n <= Double(Int64.max) {
-                    return NSNumber(value: Int64(n))
-                }
-            }
-            return NSNumber(value: n)
-        }
-
-        if let s = string {
-            if options.contains(.mutableLeaves) {
-                return NSMutableString(string: s)
-            }
-            return NSString(string: s)
-        }
-
-        if let arr = array {
-            let result = NSMutableArray()
-
-            for element in arr {
-                let foundationValue = try element.toFoundationObject(options: options)
-                result.add(foundationValue)
+    extension YYJSONValue {
+        fileprivate func toFoundationObject(options: YYJSONSerialization.ReadingOptions) throws -> Any {
+            if isNull {
+                return NSNull()
             }
 
-            if options.contains(.mutableContainers) {
-                return result
-            } else {
-                return NSArray(array: Array(result))
-            }
-        }
-
-        if let obj = object {
-            let result = NSMutableDictionary()
-
-            for (key, value) in obj {
-                let foundationValue = try value.toFoundationObject(options: options)
-                result[key] = foundationValue
+            if let b = bool {
+                return NSNumber(value: b)
             }
 
-            if options.contains(.mutableContainers) {
-                return result
-            } else {
-                var swiftDict: [String: Any] = [:]
-                for (key, value) in result {
-                    if let keyString = key as? String {
-                        swiftDict[keyString] = value
+            if let n = number {
+                if n.truncatingRemainder(dividingBy: 1) == 0 {
+                    if n >= Double(Int64.min) && n <= Double(Int64.max) {
+                        return NSNumber(value: Int64(n))
                     }
                 }
-                return NSDictionary(dictionary: swiftDict)
+                return NSNumber(value: n)
             }
-        }
 
-        return NSNull()
+            if let s = string {
+                if options.contains(.mutableLeaves) {
+                    return NSMutableString(string: s)
+                }
+                return NSString(string: s)
+            }
+
+            if let arr = array {
+                let result = NSMutableArray()
+
+                for element in arr {
+                    let foundationValue = try element.toFoundationObject(options: options)
+                    result.add(foundationValue)
+                }
+
+                if options.contains(.mutableContainers) {
+                    return result
+                } else {
+                    return NSArray(array: Array(result))
+                }
+            }
+
+            if let obj = object {
+                let result = NSMutableDictionary()
+
+                for (key, value) in obj {
+                    let foundationValue = try value.toFoundationObject(options: options)
+                    result[key] = foundationValue
+                }
+
+                if options.contains(.mutableContainers) {
+                    return result
+                } else {
+                    var swiftDict: [String: Any] = [:]
+                    for (key, value) in result {
+                        if let keyString = key as? String {
+                            swiftDict[keyString] = value
+                        }
+                    }
+                    return NSDictionary(dictionary: swiftDict)
+                }
+            }
+
+            return NSNull()
+        }
     }
-}
+
+#endif  // !YYJSON_DISABLE_READER

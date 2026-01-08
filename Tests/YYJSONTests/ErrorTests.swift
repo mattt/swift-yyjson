@@ -116,277 +116,289 @@ struct ErrorEquatableTests {
 
 // MARK: - Parsing Error Tests
 
-@Suite("YYJSONError - Parsing Errors")
-struct ErrorParsingTests {
-    @Test func emptyContentError() throws {
-        let data = Data()
-        do {
-            _ = try YYJSONValue(data: data)
-            Issue.record("Expected error to be thrown")
-        } catch let error as YYJSONError {
-            #expect(error.kind == .invalidJSON)
+#if !YYJSON_DISABLE_READER
+
+    @Suite("YYJSONError - Parsing Errors")
+    struct ErrorParsingTests {
+        @Test func emptyContentError() throws {
+            let data = Data()
+            do {
+                _ = try YYJSONValue(data: data)
+                Issue.record("Expected error to be thrown")
+            } catch let error as YYJSONError {
+                #expect(error.kind == .invalidJSON)
+            }
+        }
+
+        @Test func unexpectedCharacterError() throws {
+            let json = "{ invalid }"
+            do {
+                _ = try YYJSONValue(string: json)
+                Issue.record("Expected error to be thrown")
+            } catch let error as YYJSONError {
+                #expect(error.kind == .invalidJSON)
+            }
+        }
+
+        @Test func unexpectedEndError() throws {
+            let json = #"{"key": "#
+            do {
+                _ = try YYJSONValue(string: json)
+                Issue.record("Expected error to be thrown")
+            } catch let error as YYJSONError {
+                #expect(error.kind == .invalidJSON)
+            }
+        }
+
+        @Test func invalidNumberError() throws {
+            let json = "123abc"
+            do {
+                _ = try YYJSONValue(string: json)
+                Issue.record("Expected error to be thrown")
+            } catch let error as YYJSONError {
+                #expect(error.kind == .invalidJSON)
+            }
+        }
+
+        @Test func invalidStringError() throws {
+            let json = #""unterminated"#
+            do {
+                _ = try YYJSONValue(string: json)
+                Issue.record("Expected error to be thrown")
+            } catch let error as YYJSONError {
+                #expect(error.kind == .invalidJSON)
+            }
+        }
+
+        @Test func invalidLiteralError() throws {
+            let json = "tru"
+            do {
+                _ = try YYJSONValue(string: json)
+                Issue.record("Expected error to be thrown")
+            } catch let error as YYJSONError {
+                #expect(error.kind == .invalidJSON)
+            }
+        }
+
+        @Test func invalidUTF8Error() throws {
+            let invalidUTF8 = Data([0x22, 0xFE, 0xFF, 0x22])
+            do {
+                _ = try YYJSONValue(data: invalidUTF8)
+                Issue.record("Expected error to be thrown")
+            } catch let error as YYJSONError {
+                #expect(error.kind == .invalidJSON)
+            }
         }
     }
 
-    @Test func unexpectedCharacterError() throws {
-        let json = "{ invalid }"
-        do {
-            _ = try YYJSONValue(string: json)
-            Issue.record("Expected error to be thrown")
-        } catch let error as YYJSONError {
-            #expect(error.kind == .invalidJSON)
-        }
-    }
-
-    @Test func unexpectedEndError() throws {
-        let json = #"{"key": "#
-        do {
-            _ = try YYJSONValue(string: json)
-            Issue.record("Expected error to be thrown")
-        } catch let error as YYJSONError {
-            #expect(error.kind == .invalidJSON)
-        }
-    }
-
-    @Test func invalidNumberError() throws {
-        let json = "123abc"
-        do {
-            _ = try YYJSONValue(string: json)
-            Issue.record("Expected error to be thrown")
-        } catch let error as YYJSONError {
-            #expect(error.kind == .invalidJSON)
-        }
-    }
-
-    @Test func invalidStringError() throws {
-        let json = #""unterminated"#
-        do {
-            _ = try YYJSONValue(string: json)
-            Issue.record("Expected error to be thrown")
-        } catch let error as YYJSONError {
-            #expect(error.kind == .invalidJSON)
-        }
-    }
-
-    @Test func invalidLiteralError() throws {
-        let json = "tru"
-        do {
-            _ = try YYJSONValue(string: json)
-            Issue.record("Expected error to be thrown")
-        } catch let error as YYJSONError {
-            #expect(error.kind == .invalidJSON)
-        }
-    }
-
-    @Test func invalidUTF8Error() throws {
-        let invalidUTF8 = Data([0x22, 0xFE, 0xFF, 0x22])
-        do {
-            _ = try YYJSONValue(data: invalidUTF8)
-            Issue.record("Expected error to be thrown")
-        } catch let error as YYJSONError {
-            #expect(error.kind == .invalidJSON)
-        }
-    }
-}
+#endif  // !YYJSON_DISABLE_READER
 
 // MARK: - Decoding Error Tests
 
-@Suite("YYJSONError - Decoding Errors")
-struct ErrorDecodingTests {
-    struct SimpleStruct: Codable {
-        let name: String
-        let age: Int
-    }
+#if !YYJSON_DISABLE_READER
 
-    @Test func missingRequiredKeyError() throws {
-        let json = #"{"name": "Alice"}"#
-        let data = json.data(using: .utf8)!
-        let decoder = YYJSONDecoder()
-        do {
-            _ = try decoder.decode(SimpleStruct.self, from: data)
-            Issue.record("Expected error to be thrown")
-        } catch let error as YYJSONError {
-            if case .missingKey(let key) = error.kind {
-                #expect(key == "age")
-            } else {
-                Issue.record("Expected missingKey error kind")
+    @Suite("YYJSONError - Decoding Errors")
+    struct ErrorDecodingTests {
+        struct SimpleStruct: Codable {
+            let name: String
+            let age: Int
+        }
+
+        @Test func missingRequiredKeyError() throws {
+            let json = #"{"name": "Alice"}"#
+            let data = json.data(using: .utf8)!
+            let decoder = YYJSONDecoder()
+            do {
+                _ = try decoder.decode(SimpleStruct.self, from: data)
+                Issue.record("Expected error to be thrown")
+            } catch let error as YYJSONError {
+                if case .missingKey(let key) = error.kind {
+                    #expect(key == "age")
+                } else {
+                    Issue.record("Expected missingKey error kind")
+                }
+            }
+        }
+
+        @Test func typeMismatchErrorOnDecode() throws {
+            // Decoder coerces numbers to strings, so test with an object instead
+            let json = #"{"name": {"nested": "value"}, "age": 30}"#
+            let data = json.data(using: .utf8)!
+            let decoder = YYJSONDecoder()
+            do {
+                _ = try decoder.decode(SimpleStruct.self, from: data)
+                Issue.record("Expected error to be thrown")
+            } catch let error as YYJSONError {
+                if case .typeMismatch(let expected, _) = error.kind {
+                    #expect(expected == "string")
+                } else {
+                    Issue.record("Expected typeMismatch error kind, got \(error.kind)")
+                }
+            }
+        }
+
+        @Test func typeMismatchIntFromString() throws {
+            let json = #"{"name": "Alice", "age": "thirty"}"#
+            let data = json.data(using: .utf8)!
+            let decoder = YYJSONDecoder()
+            do {
+                _ = try decoder.decode(SimpleStruct.self, from: data)
+                Issue.record("Expected error to be thrown")
+            } catch let error as YYJSONError {
+                if case .typeMismatch = error.kind {
+                    #expect(error.path.contains("age"))
+                } else {
+                    Issue.record("Expected typeMismatch error kind")
+                }
+            }
+        }
+
+        @Test func typeMismatchExpectingArray() throws {
+            let json = #"{"items": "not an array"}"#
+            let data = json.data(using: .utf8)!
+
+            struct Container: Codable {
+                let items: [Int]
+            }
+
+            let decoder = YYJSONDecoder()
+            do {
+                _ = try decoder.decode(Container.self, from: data)
+                Issue.record("Expected error to be thrown")
+            } catch let error as YYJSONError {
+                if case .typeMismatch(let expected, _) = error.kind {
+                    #expect(expected == "array")
+                } else {
+                    Issue.record("Expected typeMismatch error kind")
+                }
+            }
+        }
+
+        @Test func typeMismatchExpectingObject() throws {
+            let json = "[1, 2, 3]"
+            let data = json.data(using: .utf8)!
+            let decoder = YYJSONDecoder()
+            do {
+                _ = try decoder.decode(SimpleStruct.self, from: data)
+                Issue.record("Expected error to be thrown")
+            } catch let error as YYJSONError {
+                if case .typeMismatch(let expected, _) = error.kind {
+                    #expect(expected == "object")
+                } else {
+                    Issue.record("Expected typeMismatch error kind")
+                }
+            }
+        }
+
+        @Test func invalidBase64DataError() throws {
+            let json = #"{"data": "not-valid-base64!!!"}"#
+            let data = json.data(using: .utf8)!
+
+            struct Container: Codable {
+                let data: Data
+            }
+
+            var decoder = YYJSONDecoder()
+            decoder.dataDecodingStrategy = .base64
+            do {
+                _ = try decoder.decode(Container.self, from: data)
+                Issue.record("Expected error to be thrown")
+            } catch let error as YYJSONError {
+                #expect(error.kind == .invalidData)
+            }
+        }
+
+        @Test func invalidISO8601DateError() throws {
+            let json = #"{"date": "not-a-date"}"#
+            let data = json.data(using: .utf8)!
+
+            struct Container: Codable {
+                let date: Date
+            }
+
+            var decoder = YYJSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            do {
+                _ = try decoder.decode(Container.self, from: data)
+                Issue.record("Expected error to be thrown")
+            } catch let error as YYJSONError {
+                #expect(error.kind == .invalidData)
             }
         }
     }
 
-    @Test func typeMismatchErrorOnDecode() throws {
-        // Decoder coerces numbers to strings, so test with an object instead
-        let json = #"{"name": {"nested": "value"}, "age": 30}"#
-        let data = json.data(using: .utf8)!
-        let decoder = YYJSONDecoder()
-        do {
-            _ = try decoder.decode(SimpleStruct.self, from: data)
-            Issue.record("Expected error to be thrown")
-        } catch let error as YYJSONError {
-            if case .typeMismatch(let expected, _) = error.kind {
-                #expect(expected == "string")
-            } else {
-                Issue.record("Expected typeMismatch error kind, got \(error.kind)")
-            }
-        }
-    }
-
-    @Test func typeMismatchIntFromString() throws {
-        let json = #"{"name": "Alice", "age": "thirty"}"#
-        let data = json.data(using: .utf8)!
-        let decoder = YYJSONDecoder()
-        do {
-            _ = try decoder.decode(SimpleStruct.self, from: data)
-            Issue.record("Expected error to be thrown")
-        } catch let error as YYJSONError {
-            if case .typeMismatch = error.kind {
-                #expect(error.path.contains("age"))
-            } else {
-                Issue.record("Expected typeMismatch error kind")
-            }
-        }
-    }
-
-    @Test func typeMismatchExpectingArray() throws {
-        let json = #"{"items": "not an array"}"#
-        let data = json.data(using: .utf8)!
-
-        struct Container: Codable {
-            let items: [Int]
-        }
-
-        let decoder = YYJSONDecoder()
-        do {
-            _ = try decoder.decode(Container.self, from: data)
-            Issue.record("Expected error to be thrown")
-        } catch let error as YYJSONError {
-            if case .typeMismatch(let expected, _) = error.kind {
-                #expect(expected == "array")
-            } else {
-                Issue.record("Expected typeMismatch error kind")
-            }
-        }
-    }
-
-    @Test func typeMismatchExpectingObject() throws {
-        let json = "[1, 2, 3]"
-        let data = json.data(using: .utf8)!
-        let decoder = YYJSONDecoder()
-        do {
-            _ = try decoder.decode(SimpleStruct.self, from: data)
-            Issue.record("Expected error to be thrown")
-        } catch let error as YYJSONError {
-            if case .typeMismatch(let expected, _) = error.kind {
-                #expect(expected == "object")
-            } else {
-                Issue.record("Expected typeMismatch error kind")
-            }
-        }
-    }
-
-    @Test func invalidBase64DataError() throws {
-        let json = #"{"data": "not-valid-base64!!!"}"#
-        let data = json.data(using: .utf8)!
-
-        struct Container: Codable {
-            let data: Data
-        }
-
-        var decoder = YYJSONDecoder()
-        decoder.dataDecodingStrategy = .base64
-        do {
-            _ = try decoder.decode(Container.self, from: data)
-            Issue.record("Expected error to be thrown")
-        } catch let error as YYJSONError {
-            #expect(error.kind == .invalidData)
-        }
-    }
-
-    @Test func invalidISO8601DateError() throws {
-        let json = #"{"date": "not-a-date"}"#
-        let data = json.data(using: .utf8)!
-
-        struct Container: Codable {
-            let date: Date
-        }
-
-        var decoder = YYJSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        do {
-            _ = try decoder.decode(Container.self, from: data)
-            Issue.record("Expected error to be thrown")
-        } catch let error as YYJSONError {
-            #expect(error.kind == .invalidData)
-        }
-    }
-}
+#endif  // !YYJSON_DISABLE_READER
 
 // MARK: - Error Path Tests
 
-@Suite("YYJSONError - Path Tracking")
-struct ErrorPathTests {
-    @Test func nestedPathTracking() throws {
-        // Use an object instead of number since decoder coerces numbers to strings
-        let json = """
-            {
-                "user": {
-                    "profile": {
-                        "name": {"nested": "value"}
+#if !YYJSON_DISABLE_READER
+
+    @Suite("YYJSONError - Path Tracking")
+    struct ErrorPathTests {
+        @Test func nestedPathTracking() throws {
+            // Use an object instead of number since decoder coerces numbers to strings
+            let json = """
+                {
+                    "user": {
+                        "profile": {
+                            "name": {"nested": "value"}
+                        }
                     }
                 }
+                """
+            let data = json.data(using: .utf8)!
+
+            struct Profile: Codable {
+                let name: String
             }
-            """
-        let data = json.data(using: .utf8)!
+            struct User: Codable {
+                let profile: Profile
+            }
+            struct Root: Codable {
+                let user: User
+            }
 
-        struct Profile: Codable {
-            let name: String
-        }
-        struct User: Codable {
-            let profile: Profile
-        }
-        struct Root: Codable {
-            let user: User
+            let decoder = YYJSONDecoder()
+            do {
+                _ = try decoder.decode(Root.self, from: data)
+                Issue.record("Expected error to be thrown")
+            } catch let error as YYJSONError {
+                #expect(error.path.contains("user"))
+                #expect(error.path.contains("profile"))
+                #expect(error.path.contains("name"))
+            }
         }
 
-        let decoder = YYJSONDecoder()
-        do {
-            _ = try decoder.decode(Root.self, from: data)
-            Issue.record("Expected error to be thrown")
-        } catch let error as YYJSONError {
-            #expect(error.path.contains("user"))
-            #expect(error.path.contains("profile"))
-            #expect(error.path.contains("name"))
+        @Test func arrayIndexPathTracking() throws {
+            let json = """
+                {
+                    "items": [
+                        {"value": 1},
+                        {"value": "not a number"},
+                        {"value": 3}
+                    ]
+                }
+                """
+            let data = json.data(using: .utf8)!
+
+            struct Item: Codable {
+                let value: Int
+            }
+            struct Root: Codable {
+                let items: [Item]
+            }
+
+            let decoder = YYJSONDecoder()
+            do {
+                _ = try decoder.decode(Root.self, from: data)
+                Issue.record("Expected error to be thrown")
+            } catch let error as YYJSONError {
+                #expect(error.path.contains("items"))
+            }
         }
     }
 
-    @Test func arrayIndexPathTracking() throws {
-        let json = """
-            {
-                "items": [
-                    {"value": 1},
-                    {"value": "not a number"},
-                    {"value": 3}
-                ]
-            }
-            """
-        let data = json.data(using: .utf8)!
-
-        struct Item: Codable {
-            let value: Int
-        }
-        struct Root: Codable {
-            let items: [Item]
-        }
-
-        let decoder = YYJSONDecoder()
-        do {
-            _ = try decoder.decode(Root.self, from: data)
-            Issue.record("Expected error to be thrown")
-        } catch let error as YYJSONError {
-            #expect(error.path.contains("items"))
-        }
-    }
-}
+#endif  // !YYJSON_DISABLE_READER
 
 // MARK: - Sendable Tests
 
