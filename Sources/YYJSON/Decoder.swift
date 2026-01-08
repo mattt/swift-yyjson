@@ -20,14 +20,18 @@ import Foundation
         /// The strategy used by a decoder when it encounters exceptional floating-point values.
         public var nonConformingFloatDecodingStrategy: NonConformingFloatDecodingStrategy = .throw
 
-        /// Specifies that decoding supports the JSON5 syntax.
-        ///
-        /// Set to `true` to enable all JSON5 features, or configure individual options:
-        /// ```swift
-        /// decoder.allowsJSON5 = true  // Enable all JSON5 features
-        /// decoder.allowsJSON5 = .init(trailingCommas: true, comments: true)  // Selective
-        /// ```
-        public var allowsJSON5: JSON5DecodingOptions = false
+        #if !YYJSON_DISABLE_NON_STANDARD
+
+            /// Specifies that decoding supports the JSON5 syntax.
+            ///
+            /// Set to `true` to enable all JSON5 features, or configure individual options:
+            /// ```swift
+            /// decoder.allowsJSON5 = true  // Enable all JSON5 features
+            /// decoder.allowsJSON5 = .init(trailingCommas: true, comments: true)  // Selective
+            /// ```
+            public var allowsJSON5: JSON5DecodingOptions = false
+
+        #endif  // !YYJSON_DISABLE_NON_STANDARD
 
         /// A dictionary you use to customize the decoding process by providing contextual information.
         public var userInfo: [CodingUserInfoKey: Any] = [:]
@@ -39,7 +43,9 @@ import Foundation
             self.dateDecodingStrategy = .deferredToDate
             self.dataDecodingStrategy = .base64
             self.nonConformingFloatDecodingStrategy = .throw
-            self.allowsJSON5 = false
+            #if !YYJSON_DISABLE_NON_STANDARD
+                self.allowsJSON5 = false
+            #endif
             self.userInfo = [:]
         }
 
@@ -51,7 +57,9 @@ import Foundation
         /// - Throws: `YYJSONError` if decoding fails.
         public func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
             var options = readOptions
-            options.formUnion(allowsJSON5.readOptions)
+            #if !YYJSON_DISABLE_NON_STANDARD
+                options.formUnion(allowsJSON5.readOptions)
+            #endif
 
             let document = try YYDocument(data: data, options: options)
             guard let root = document.root else {
@@ -74,83 +82,87 @@ import Foundation
 
     // MARK: - JSON5 Decoding Options
 
-    /// Options for JSON5 decoding, allowing granular control over non-standard JSON features.
-    ///
-    /// Use `true` to enable all JSON5 features, or configure individual options:
-    /// ```swift
-    /// decoder.allowsJSON5 = true  // Enable all JSON5 features
-    /// decoder.allowsJSON5 = .init(trailingCommas: true, comments: true)  // Selective
-    /// ```
-    public struct JSON5DecodingOptions: ExpressibleByBooleanLiteral, Sendable {
-        /// Allow single trailing comma at the end of an object or array.
-        public var trailingCommas: Bool
+    #if !YYJSON_DISABLE_NON_STANDARD
 
-        /// Allow C-style single-line and multi-line comments.
-        public var comments: Bool
+        /// Options for JSON5 decoding, allowing granular control over non-standard JSON features.
+        ///
+        /// Use `true` to enable all JSON5 features, or configure individual options:
+        /// ```swift
+        /// decoder.allowsJSON5 = true  // Enable all JSON5 features
+        /// decoder.allowsJSON5 = .init(trailingCommas: true, comments: true)  // Selective
+        /// ```
+        public struct JSON5DecodingOptions: ExpressibleByBooleanLiteral, Sendable {
+            /// Allow single trailing comma at the end of an object or array.
+            public var trailingCommas: Bool
 
-        /// Allow inf/nan number and literal, case-insensitive.
-        public var infAndNaN: Bool
+            /// Allow C-style single-line and multi-line comments.
+            public var comments: Bool
 
-        /// Allow extended number formats (hex, leading/trailing decimal point, leading plus).
-        public var extendedNumbers: Bool
+            /// Allow inf/nan number and literal, case-insensitive.
+            public var infAndNaN: Bool
 
-        /// Allow extended escape sequences in strings.
-        public var extendedEscapes: Bool
+            /// Allow extended number formats (hex, leading/trailing decimal point, leading plus).
+            public var extendedNumbers: Bool
 
-        /// Allow extended whitespace characters.
-        public var extendedWhitespace: Bool
+            /// Allow extended escape sequences in strings.
+            public var extendedEscapes: Bool
 
-        /// Allow strings enclosed in single quotes.
-        public var singleQuotedStrings: Bool
+            /// Allow extended whitespace characters.
+            public var extendedWhitespace: Bool
 
-        /// Allow object keys without quotes.
-        public var unquotedKeys: Bool
+            /// Allow strings enclosed in single quotes.
+            public var singleQuotedStrings: Bool
 
-        public init(booleanLiteral value: Bool) {
-            self.trailingCommas = value
-            self.comments = value
-            self.infAndNaN = value
-            self.extendedNumbers = value
-            self.extendedEscapes = value
-            self.extendedWhitespace = value
-            self.singleQuotedStrings = value
-            self.unquotedKeys = value
+            /// Allow object keys without quotes.
+            public var unquotedKeys: Bool
+
+            public init(booleanLiteral value: Bool) {
+                self.trailingCommas = value
+                self.comments = value
+                self.infAndNaN = value
+                self.extendedNumbers = value
+                self.extendedEscapes = value
+                self.extendedWhitespace = value
+                self.singleQuotedStrings = value
+                self.unquotedKeys = value
+            }
+
+            public init(
+                trailingCommas: Bool = false,
+                comments: Bool = false,
+                infAndNaN: Bool = false,
+                extendedNumbers: Bool = false,
+                extendedEscapes: Bool = false,
+                extendedWhitespace: Bool = false,
+                singleQuotedStrings: Bool = false,
+                unquotedKeys: Bool = false
+            ) {
+                self.trailingCommas = trailingCommas
+                self.comments = comments
+                self.infAndNaN = infAndNaN
+                self.extendedNumbers = extendedNumbers
+                self.extendedEscapes = extendedEscapes
+                self.extendedWhitespace = extendedWhitespace
+                self.singleQuotedStrings = singleQuotedStrings
+                self.unquotedKeys = unquotedKeys
+            }
+
+            /// Convert to yyjson read options.
+            internal var readOptions: YYJSONReadOptions {
+                var options: YYJSONReadOptions = []
+                if trailingCommas { options.insert(.allowTrailingCommas) }
+                if comments { options.insert(.allowComments) }
+                if infAndNaN { options.insert(.allowInfAndNaN) }
+                if extendedNumbers { options.insert(.allowExtendedNumbers) }
+                if extendedEscapes { options.insert(.allowExtendedEscapes) }
+                if extendedWhitespace { options.insert(.allowExtendedWhitespace) }
+                if singleQuotedStrings { options.insert(.allowSingleQuotedStrings) }
+                if unquotedKeys { options.insert(.allowUnquotedKeys) }
+                return options
+            }
         }
 
-        public init(
-            trailingCommas: Bool = false,
-            comments: Bool = false,
-            infAndNaN: Bool = false,
-            extendedNumbers: Bool = false,
-            extendedEscapes: Bool = false,
-            extendedWhitespace: Bool = false,
-            singleQuotedStrings: Bool = false,
-            unquotedKeys: Bool = false
-        ) {
-            self.trailingCommas = trailingCommas
-            self.comments = comments
-            self.infAndNaN = infAndNaN
-            self.extendedNumbers = extendedNumbers
-            self.extendedEscapes = extendedEscapes
-            self.extendedWhitespace = extendedWhitespace
-            self.singleQuotedStrings = singleQuotedStrings
-            self.unquotedKeys = unquotedKeys
-        }
-
-        /// Convert to yyjson read options.
-        internal var readOptions: YYJSONReadOptions {
-            var options: YYJSONReadOptions = []
-            if trailingCommas { options.insert(.allowTrailingCommas) }
-            if comments { options.insert(.allowComments) }
-            if infAndNaN { options.insert(.allowInfAndNaN) }
-            if extendedNumbers { options.insert(.allowExtendedNumbers) }
-            if extendedEscapes { options.insert(.allowExtendedEscapes) }
-            if extendedWhitespace { options.insert(.allowExtendedWhitespace) }
-            if singleQuotedStrings { options.insert(.allowSingleQuotedStrings) }
-            if unquotedKeys { options.insert(.allowUnquotedKeys) }
-            return options
-        }
-    }
+    #endif  // !YYJSON_DISABLE_NON_STANDARD
 
     // MARK: - Decoding Strategies
 

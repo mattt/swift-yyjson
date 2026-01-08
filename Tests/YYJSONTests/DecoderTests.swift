@@ -727,70 +727,74 @@ import Testing
 
     // MARK: - JSON5 Decoding Tests
 
-    @Suite("YYJSONDecoder - JSON5")
-    struct DecoderJSON5Tests {
-        struct SimpleStruct: Codable {
-            let name: String
-            let value: Int
+    #if !YYJSON_DISABLE_NON_STANDARD
+
+        @Suite("YYJSONDecoder - JSON5")
+        struct DecoderJSON5Tests {
+            struct SimpleStruct: Codable {
+                let name: String
+                let value: Int
+            }
+
+            @Test func decodeJSON5WithTrailingComma() throws {
+                let json = #"{"name": "test", "value": 42,}"#
+                let data = json.data(using: .utf8)!
+                var decoder = YYJSONDecoder()
+                decoder.allowsJSON5 = true
+                let result = try decoder.decode(SimpleStruct.self, from: data)
+                #expect(result.name == "test")
+                #expect(result.value == 42)
+            }
+
+            @Test func decodeJSON5WithComments() throws {
+                let json = """
+                    {
+                        // This is a comment
+                        "name": "test",
+                        /* Multi-line
+                           comment */
+                        "value": 42
+                    }
+                    """
+                let data = json.data(using: .utf8)!
+                var decoder = YYJSONDecoder()
+                decoder.allowsJSON5 = true
+                let result = try decoder.decode(SimpleStruct.self, from: data)
+                #expect(result.name == "test")
+                #expect(result.value == 42)
+            }
+
+            @Test func decodeJSON5WithSingleQuotes() throws {
+                let json = #"{'name': 'test', 'value': 42}"#
+                let data = json.data(using: .utf8)!
+                var decoder = YYJSONDecoder()
+                decoder.allowsJSON5 = true
+                let result = try decoder.decode(SimpleStruct.self, from: data)
+                #expect(result.name == "test")
+                #expect(result.value == 42)
+            }
+
+            @Test func decodeJSON5WithUnquotedKeys() throws {
+                let json = #"{name: "test", value: 42}"#
+                let data = json.data(using: .utf8)!
+                var decoder = YYJSONDecoder()
+                decoder.allowsJSON5 = true
+                let result = try decoder.decode(SimpleStruct.self, from: data)
+                #expect(result.name == "test")
+                #expect(result.value == 42)
+            }
+
+            @Test func decodeJSON5WithSelectiveOptions() throws {
+                let json = #"{"name": "test", "value": 42,}"#
+                let data = json.data(using: .utf8)!
+                var decoder = YYJSONDecoder()
+                decoder.allowsJSON5 = JSON5DecodingOptions(trailingCommas: true)
+                let result = try decoder.decode(SimpleStruct.self, from: data)
+                #expect(result.name == "test")
+            }
         }
 
-        @Test func decodeJSON5WithTrailingComma() throws {
-            let json = #"{"name": "test", "value": 42,}"#
-            let data = json.data(using: .utf8)!
-            var decoder = YYJSONDecoder()
-            decoder.allowsJSON5 = true
-            let result = try decoder.decode(SimpleStruct.self, from: data)
-            #expect(result.name == "test")
-            #expect(result.value == 42)
-        }
-
-        @Test func decodeJSON5WithComments() throws {
-            let json = """
-                {
-                    // This is a comment
-                    "name": "test",
-                    /* Multi-line
-                       comment */
-                    "value": 42
-                }
-                """
-            let data = json.data(using: .utf8)!
-            var decoder = YYJSONDecoder()
-            decoder.allowsJSON5 = true
-            let result = try decoder.decode(SimpleStruct.self, from: data)
-            #expect(result.name == "test")
-            #expect(result.value == 42)
-        }
-
-        @Test func decodeJSON5WithSingleQuotes() throws {
-            let json = #"{'name': 'test', 'value': 42}"#
-            let data = json.data(using: .utf8)!
-            var decoder = YYJSONDecoder()
-            decoder.allowsJSON5 = true
-            let result = try decoder.decode(SimpleStruct.self, from: data)
-            #expect(result.name == "test")
-            #expect(result.value == 42)
-        }
-
-        @Test func decodeJSON5WithUnquotedKeys() throws {
-            let json = #"{name: "test", value: 42}"#
-            let data = json.data(using: .utf8)!
-            var decoder = YYJSONDecoder()
-            decoder.allowsJSON5 = true
-            let result = try decoder.decode(SimpleStruct.self, from: data)
-            #expect(result.name == "test")
-            #expect(result.value == 42)
-        }
-
-        @Test func decodeJSON5WithSelectiveOptions() throws {
-            let json = #"{"name": "test", "value": 42,}"#
-            let data = json.data(using: .utf8)!
-            var decoder = YYJSONDecoder()
-            decoder.allowsJSON5 = JSON5DecodingOptions(trailingCommas: true)
-            let result = try decoder.decode(SimpleStruct.self, from: data)
-            #expect(result.name == "test")
-        }
-    }
+    #endif  // !YYJSON_DISABLE_NON_STANDARD
 
     // MARK: - UserInfo Tests
 

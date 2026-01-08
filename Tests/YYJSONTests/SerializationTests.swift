@@ -115,16 +115,20 @@ import Testing
             }
         }
 
-        @Test func readWithJSON5() throws {
-            let json = #"{"key": "value",}"#
-            let data = json.data(using: .utf8)!
-            let result =
-                try YYJSONSerialization.jsonObject(
-                    with: data,
-                    options: .json5Allowed
-                ) as? NSDictionary
-            #expect(result?["key"] as? String == "value")
-        }
+        #if !YYJSON_DISABLE_NON_STANDARD
+
+            @Test func readWithJSON5() throws {
+                let json = #"{"key": "value",}"#
+                let data = json.data(using: .utf8)!
+                let result =
+                    try YYJSONSerialization.jsonObject(
+                        with: data,
+                        options: .json5Allowed
+                    ) as? NSDictionary
+                #expect(result?["key"] as? String == "value")
+            }
+
+        #endif  // !YYJSON_DISABLE_NON_STANDARD
 
         @Test func readInvalidJSON() throws {
             let json = "not valid json"

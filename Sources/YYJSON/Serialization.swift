@@ -21,8 +21,12 @@ public enum YYJSONSerialization {
         /// Specifies that the parser allows top-level objects that aren't arrays or dictionaries.
         public static let fragmentsAllowed = ReadingOptions(rawValue: 1 << 2)
 
-        /// Specifies that reading serialized JSON data supports the JSON5 syntax.
-        public static let json5Allowed = ReadingOptions(rawValue: 1 << 3)
+        #if !YYJSON_DISABLE_NON_STANDARD
+
+            /// Specifies that reading serialized JSON data supports the JSON5 syntax.
+            public static let json5Allowed = ReadingOptions(rawValue: 1 << 3)
+
+        #endif  // !YYJSON_DISABLE_NON_STANDARD
 
         /// A deprecated option that specifies that the parser should allow top-level objects
         /// that aren't arrays or dictionaries.
@@ -60,9 +64,11 @@ public enum YYJSONSerialization {
     #if !YYJSON_DISABLE_READER
         public static func jsonObject(with data: Data, options: ReadingOptions = []) throws -> Any {
             var readOptions: YYJSONReadOptions = .default
-            if options.contains(.json5Allowed) {
-                readOptions.insert(.json5)
-            }
+            #if !YYJSON_DISABLE_NON_STANDARD
+                if options.contains(.json5Allowed) {
+                    readOptions.insert(.json5)
+                }
+            #endif
 
             let document = try YYDocument(data: data, options: readOptions)
             guard let root = document.root else {

@@ -27,118 +27,122 @@ import Testing
             #expect(value["key"]?.string == "value")
         }
 
-        @Test func allowTrailingCommasOption() throws {
-            let json = #"{"a": 1, "b": 2,}"#
-            let data = json.data(using: .utf8)!
-
-            let value = try YYJSONValue(data: data, options: .allowTrailingCommas)
-            #expect(value["a"]?.number == 1.0)
-            #expect(value["b"]?.number == 2.0)
-        }
-
-        @Test func allowCommentsOption() throws {
-            let json = """
-                {
-                    // Single line comment
-                    "key": "value"
-                    /* Multi-line
-                       comment */
-                }
-                """
-            let data = json.data(using: .utf8)!
-
-            let value = try YYJSONValue(data: data, options: .allowComments)
-            #expect(value["key"]?.string == "value")
-        }
-
-        @Test func allowInfAndNaNOption() throws {
-            let json = #"{"inf": Infinity, "nan": NaN}"#
-            let data = json.data(using: .utf8)!
-
-            let value = try YYJSONValue(data: data, options: .allowInfAndNaN)
-            #expect(value["inf"]?.number?.isInfinite == true)
-            #expect(value["nan"]?.number?.isNaN == true)
-        }
-
         @Test func allowInvalidUnicodeOption() throws {
             let options = YYJSONReadOptions.allowInvalidUnicode
             #expect(options.rawValue != 0)
         }
 
-        @Test func allowBOMOption() throws {
-            var json = Data([0xEF, 0xBB, 0xBF])
-            json.append(#"{"key": "value"}"#.data(using: .utf8)!)
+        #if !YYJSON_DISABLE_NON_STANDARD
 
-            let value = try YYJSONValue(data: json, options: .allowBOM)
-            #expect(value["key"]?.string == "value")
-        }
+            @Test func allowTrailingCommasOption() throws {
+                let json = #"{"a": 1, "b": 2,}"#
+                let data = json.data(using: .utf8)!
 
-        @Test func allowExtendedNumbersOption() throws {
-            let json = #"{"hex": 0xFF, "leadingPlus": +42}"#
-            let data = json.data(using: .utf8)!
+                let value = try YYJSONValue(data: data, options: .allowTrailingCommas)
+                #expect(value["a"]?.number == 1.0)
+                #expect(value["b"]?.number == 2.0)
+            }
 
-            let value = try YYJSONValue(data: data, options: .allowExtendedNumbers)
-            #expect(value["hex"]?.number == 255.0)
-            #expect(value["leadingPlus"]?.number == 42.0)
-        }
+            @Test func allowCommentsOption() throws {
+                let json = """
+                    {
+                        // Single line comment
+                        "key": "value"
+                        /* Multi-line
+                           comment */
+                    }
+                    """
+                let data = json.data(using: .utf8)!
 
-        @Test func allowSingleQuotedStringsOption() throws {
-            let json = "{'key': 'value'}"
-            let data = json.data(using: .utf8)!
+                let value = try YYJSONValue(data: data, options: .allowComments)
+                #expect(value["key"]?.string == "value")
+            }
 
-            let value = try YYJSONValue(data: data, options: .allowSingleQuotedStrings)
-            #expect(value["key"]?.string == "value")
-        }
+            @Test func allowInfAndNaNOption() throws {
+                let json = #"{"inf": Infinity, "nan": NaN}"#
+                let data = json.data(using: .utf8)!
 
-        @Test func allowUnquotedKeysOption() throws {
-            let json = "{key: \"value\"}"
-            let data = json.data(using: .utf8)!
+                let value = try YYJSONValue(data: data, options: .allowInfAndNaN)
+                #expect(value["inf"]?.number?.isInfinite == true)
+                #expect(value["nan"]?.number?.isNaN == true)
+            }
 
-            let value = try YYJSONValue(data: data, options: .allowUnquotedKeys)
-            #expect(value["key"]?.string == "value")
-        }
+            @Test func allowBOMOption() throws {
+                var json = Data([0xEF, 0xBB, 0xBF])
+                json.append(#"{"key": "value"}"#.data(using: .utf8)!)
 
-        @Test func json5Option() throws {
-            let json = """
-                {
-                    // This is JSON5
-                    key: 'value',
-                    number: +42,
-                }
-                """
-            let data = json.data(using: .utf8)!
+                let value = try YYJSONValue(data: json, options: .allowBOM)
+                #expect(value["key"]?.string == "value")
+            }
 
-            let value = try YYJSONValue(data: data, options: .json5)
-            #expect(value["key"]?.string == "value")
-            #expect(value["number"]?.number == 42.0)
-        }
+            @Test func allowExtendedNumbersOption() throws {
+                let json = #"{"hex": 0xFF, "leadingPlus": +42}"#
+                let data = json.data(using: .utf8)!
 
-        @Test func combinedOptions() throws {
-            let options: YYJSONReadOptions = [.allowTrailingCommas, .allowComments]
-            let json = """
-                {
-                    // Comment
-                    "key": "value",
-                }
-                """
-            let data = json.data(using: .utf8)!
+                let value = try YYJSONValue(data: data, options: .allowExtendedNumbers)
+                #expect(value["hex"]?.number == 255.0)
+                #expect(value["leadingPlus"]?.number == 42.0)
+            }
 
-            let value = try YYJSONValue(data: data, options: options)
-            #expect(value["key"]?.string == "value")
-        }
+            @Test func allowSingleQuotedStringsOption() throws {
+                let json = "{'key': 'value'}"
+                let data = json.data(using: .utf8)!
 
-        @Test func optionSetOperations() {
-            var options = YYJSONReadOptions.default
-            options.insert(.allowTrailingCommas)
-            #expect(options.contains(.allowTrailingCommas))
+                let value = try YYJSONValue(data: data, options: .allowSingleQuotedStrings)
+                #expect(value["key"]?.string == "value")
+            }
 
-            options.remove(.allowTrailingCommas)
-            #expect(!options.contains(.allowTrailingCommas))
+            @Test func allowUnquotedKeysOption() throws {
+                let json = "{key: \"value\"}"
+                let data = json.data(using: .utf8)!
 
-            let combined = YYJSONReadOptions.allowComments.union(.allowTrailingCommas)
-            #expect(combined.contains(.allowComments))
-            #expect(combined.contains(.allowTrailingCommas))
-        }
+                let value = try YYJSONValue(data: data, options: .allowUnquotedKeys)
+                #expect(value["key"]?.string == "value")
+            }
+
+            @Test func json5Option() throws {
+                let json = """
+                    {
+                        // This is JSON5
+                        key: 'value',
+                        number: +42,
+                    }
+                    """
+                let data = json.data(using: .utf8)!
+
+                let value = try YYJSONValue(data: data, options: .json5)
+                #expect(value["key"]?.string == "value")
+                #expect(value["number"]?.number == 42.0)
+            }
+
+            @Test func combinedOptions() throws {
+                let options: YYJSONReadOptions = [.allowTrailingCommas, .allowComments]
+                let json = """
+                    {
+                        // Comment
+                        "key": "value",
+                    }
+                    """
+                let data = json.data(using: .utf8)!
+
+                let value = try YYJSONValue(data: data, options: options)
+                #expect(value["key"]?.string == "value")
+            }
+
+            @Test func optionSetOperations() {
+                var options = YYJSONReadOptions.default
+                options.insert(.allowTrailingCommas)
+                #expect(options.contains(.allowTrailingCommas))
+
+                options.remove(.allowTrailingCommas)
+                #expect(!options.contains(.allowTrailingCommas))
+
+                let combined = YYJSONReadOptions.allowComments.union(.allowTrailingCommas)
+                #expect(combined.contains(.allowComments))
+                #expect(combined.contains(.allowTrailingCommas))
+            }
+
+        #endif  // !YYJSON_DISABLE_NON_STANDARD
     }
 
 #endif  // !YYJSON_DISABLE_READER
@@ -201,23 +205,27 @@ import Testing
             #expect(json.contains("\\/"))
         }
 
-        @Test func allowInfAndNaNOption() throws {
-            var encoder = YYJSONEncoder()
-            encoder.writeOptions = .allowInfAndNaN
+        #if !YYJSON_DISABLE_NON_STANDARD
 
-            let data = try encoder.encode(Double.infinity)
-            let json = String(data: data, encoding: .utf8)!
-            #expect(json.contains("Infinity") || json.contains("inf"))
-        }
+            @Test func allowInfAndNaNOption() throws {
+                var encoder = YYJSONEncoder()
+                encoder.writeOptions = .allowInfAndNaN
 
-        @Test func infAndNaNAsNullOption() throws {
-            var encoder = YYJSONEncoder()
-            encoder.writeOptions = .infAndNaNAsNull
+                let data = try encoder.encode(Double.infinity)
+                let json = String(data: data, encoding: .utf8)!
+                #expect(json.contains("Infinity") || json.contains("inf"))
+            }
 
-            let data = try encoder.encode(Double.infinity)
-            let json = String(data: data, encoding: .utf8)!
-            #expect(json == "null")
-        }
+            @Test func infAndNaNAsNullOption() throws {
+                var encoder = YYJSONEncoder()
+                encoder.writeOptions = .infAndNaNAsNull
+
+                let data = try encoder.encode(Double.infinity)
+                let json = String(data: data, encoding: .utf8)!
+                #expect(json == "null")
+            }
+
+        #endif  // !YYJSON_DISABLE_NON_STANDARD
 
         @Test func newlineAtEndOption() throws {
             var encoder = YYJSONEncoder()
@@ -260,7 +268,7 @@ import Testing
 
 // MARK: - JSON5 Decoding Options Tests
 
-#if !YYJSON_DISABLE_READER
+#if !YYJSON_DISABLE_READER && !YYJSON_DISABLE_NON_STANDARD
 
     @Suite("JSON5DecodingOptions")
     struct JSON5DecodingOptionsTests {
@@ -356,6 +364,10 @@ import Testing
             }.value
         }
     }
+
+#endif  // !YYJSON_DISABLE_READER && !YYJSON_DISABLE_NON_STANDARD
+
+#if !YYJSON_DISABLE_READER
 
     // MARK: - Key Decoding Strategy Tests
 
@@ -591,7 +603,7 @@ import Testing
         }
 
         @Test func throwOnNonConformingDefaultsToThrow() throws {
-            var decoder = YYJSONDecoder()
+            let decoder = YYJSONDecoder()
             switch decoder.nonConformingFloatDecodingStrategy {
             case .throw:
                 #expect(true)

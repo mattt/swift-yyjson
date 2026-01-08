@@ -25,15 +25,6 @@ public struct YYJSONReadOptions: OptionSet, Sendable {
     /// after a JSON document.
     public static let stopWhenDone = YYJSONReadOptions(rawValue: YYJSON_READ_STOP_WHEN_DONE)
 
-    /// Allow single trailing comma at the end of an object or array.
-    public static let allowTrailingCommas = YYJSONReadOptions(rawValue: YYJSON_READ_ALLOW_TRAILING_COMMAS)
-
-    /// Allow C-style single-line and multi-line comments.
-    public static let allowComments = YYJSONReadOptions(rawValue: YYJSON_READ_ALLOW_COMMENTS)
-
-    /// Allow inf/nan number and literal, case-insensitive.
-    public static let allowInfAndNaN = YYJSONReadOptions(rawValue: YYJSON_READ_ALLOW_INF_AND_NAN)
-
     /// Read all numbers as raw strings.
     public static let numberAsRaw = YYJSONReadOptions(rawValue: YYJSON_READ_NUMBER_AS_RAW)
 
@@ -43,29 +34,42 @@ public struct YYJSONReadOptions: OptionSet, Sendable {
     /// Read big numbers as raw strings.
     public static let bigNumberAsRaw = YYJSONReadOptions(rawValue: YYJSON_READ_BIGNUM_AS_RAW)
 
-    /// Allow UTF-8 BOM and skip it before parsing.
-    public static let allowBOM = YYJSONReadOptions(rawValue: YYJSON_READ_ALLOW_BOM)
+    #if !YYJSON_DISABLE_NON_STANDARD
 
-    /// Allow extended number formats (hex, leading/trailing decimal point, leading plus).
-    public static let allowExtendedNumbers = YYJSONReadOptions(rawValue: YYJSON_READ_ALLOW_EXT_NUMBER)
+        /// Allow single trailing comma at the end of an object or array.
+        public static let allowTrailingCommas = YYJSONReadOptions(rawValue: YYJSON_READ_ALLOW_TRAILING_COMMAS)
 
-    /// Allow extended escape sequences in strings.
-    public static let allowExtendedEscapes = YYJSONReadOptions(rawValue: YYJSON_READ_ALLOW_EXT_ESCAPE)
+        /// Allow C-style single-line and multi-line comments.
+        public static let allowComments = YYJSONReadOptions(rawValue: YYJSON_READ_ALLOW_COMMENTS)
 
-    /// Allow extended whitespace characters.
-    public static let allowExtendedWhitespace = YYJSONReadOptions(rawValue: YYJSON_READ_ALLOW_EXT_WHITESPACE)
+        /// Allow inf/nan number and literal, case-insensitive.
+        public static let allowInfAndNaN = YYJSONReadOptions(rawValue: YYJSON_READ_ALLOW_INF_AND_NAN)
 
-    /// Allow strings enclosed in single quotes.
-    public static let allowSingleQuotedStrings = YYJSONReadOptions(rawValue: YYJSON_READ_ALLOW_SINGLE_QUOTED_STR)
+        /// Allow UTF-8 BOM and skip it before parsing.
+        public static let allowBOM = YYJSONReadOptions(rawValue: YYJSON_READ_ALLOW_BOM)
 
-    /// Allow object keys without quotes.
-    public static let allowUnquotedKeys = YYJSONReadOptions(rawValue: YYJSON_READ_ALLOW_UNQUOTED_KEY)
+        /// Allow extended number formats (hex, leading/trailing decimal point, leading plus).
+        public static let allowExtendedNumbers = YYJSONReadOptions(rawValue: YYJSON_READ_ALLOW_EXT_NUMBER)
 
-    /// Allow JSON5 format.
-    ///
-    /// This includes trailing commas, comments, inf/nan, extended numbers,
-    /// extended escapes, extended whitespace, single-quoted strings, and unquoted keys.
-    public static let json5 = YYJSONReadOptions(rawValue: YYJSON_READ_JSON5)
+        /// Allow extended escape sequences in strings.
+        public static let allowExtendedEscapes = YYJSONReadOptions(rawValue: YYJSON_READ_ALLOW_EXT_ESCAPE)
+
+        /// Allow extended whitespace characters.
+        public static let allowExtendedWhitespace = YYJSONReadOptions(rawValue: YYJSON_READ_ALLOW_EXT_WHITESPACE)
+
+        /// Allow strings enclosed in single quotes.
+        public static let allowSingleQuotedStrings = YYJSONReadOptions(rawValue: YYJSON_READ_ALLOW_SINGLE_QUOTED_STR)
+
+        /// Allow object keys without quotes.
+        public static let allowUnquotedKeys = YYJSONReadOptions(rawValue: YYJSON_READ_ALLOW_UNQUOTED_KEY)
+
+        /// Allow JSON5 format.
+        ///
+        /// This includes trailing commas, comments, inf/nan, extended numbers,
+        /// extended escapes, extended whitespace, single-quoted strings, and unquoted keys.
+        public static let json5 = YYJSONReadOptions(rawValue: YYJSON_READ_JSON5)
+
+    #endif  // !YYJSON_DISABLE_NON_STANDARD
 
     /// Convert to yyjson read flags.
     internal var yyjsonFlags: yyjson_read_flag {
@@ -96,11 +100,15 @@ public struct YYJSONWriteOptions: OptionSet, Sendable {
     /// Escape '/' as '\/'.
     public static let escapeSlashes = YYJSONWriteOptions(rawValue: YYJSON_WRITE_ESCAPE_SLASHES)
 
-    /// Write inf and nan number as 'Infinity' and 'NaN' literal.
-    public static let allowInfAndNaN = YYJSONWriteOptions(rawValue: YYJSON_WRITE_ALLOW_INF_AND_NAN)
+    #if !YYJSON_DISABLE_NON_STANDARD
 
-    /// Write inf and nan number as null literal.
-    public static let infAndNaNAsNull = YYJSONWriteOptions(rawValue: YYJSON_WRITE_INF_AND_NAN_AS_NULL)
+        /// Write inf and nan number as 'Infinity' and 'NaN' literal.
+        public static let allowInfAndNaN = YYJSONWriteOptions(rawValue: YYJSON_WRITE_ALLOW_INF_AND_NAN)
+
+        /// Write inf and nan number as null literal.
+        public static let infAndNaNAsNull = YYJSONWriteOptions(rawValue: YYJSON_WRITE_INF_AND_NAN_AS_NULL)
+
+    #endif  // !YYJSON_DISABLE_NON_STANDARD
 
     /// Allow invalid unicode when encoding string values.
     public static let allowInvalidUnicode = YYJSONWriteOptions(rawValue: YYJSON_WRITE_ALLOW_INVALID_UNICODE)

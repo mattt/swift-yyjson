@@ -78,6 +78,11 @@ decoder.allowsJSON5 = .init(
 )
 ```
 
+> [!NOTE]
+> JSON5 support is unavailable when the `strictStandardJSON` trait is enabled.
+> The `allowsJSON5` property and `JSON5DecodingOptions` type are conditionally compiled
+> and will not be available at compile time.
+
 ### Encoding with Codable
 
 Use `YYJSONEncoder` as an alternative to `JSONEncoder`:
@@ -154,6 +159,12 @@ Available options:
 
 - `.inSitu` — Parse in-place for speed (requires data to remain valid)
 - `.stopWhenDone` — Stop after first complete JSON document
+- `.numberAsRaw` — Read all numbers as raw strings
+- `.allowInvalidUnicode` — Allow reading invalid unicode
+- `.bigNumberAsRaw` — Read big numbers as raw strings
+
+Non-standard options (unavailable when `strictStandardJSON` trait is enabled):
+
 - `.allowTrailingCommas` — Allow `[1, 2, 3,]`
 - `.allowComments` — Allow `//` and `/* */` comments
 - `.allowInfAndNaN` — Allow `Infinity`, `-Infinity`, `NaN`
@@ -180,9 +191,13 @@ Available options:
 - `.prettyPrintedTwoSpaces` — Pretty print with 2-space indent
 - `.escapeUnicode` — Escape non-ASCII as `\uXXXX`
 - `.escapeSlashes` — Escape `/` as `\/`
+- `.allowInvalidUnicode` — Allow invalid unicode when encoding
+- `.newlineAtEnd` — Add trailing newline
+
+Non-standard options (unavailable when `strictStandardJSON` trait is enabled):
+
 - `.allowInfAndNaN` — Write `Infinity` and `NaN` literals
 - `.infAndNaNAsNull` — Write `Infinity` and `NaN` as `null`
-- `.newlineAtEnd` — Add trailing newline
 
 ## Package Traits
 
@@ -262,10 +277,23 @@ Disables non-standard JSON features at compile-time
 **Reduces binary size by about 10% and slightly improves performance.**
 Use this if you only need to handle strictly conformant JSON.
 
-> [!NOTE]
-> Enabling this trait disables JSON5 support regardless of runtime options.
-> The `allowsJSON5` property on `YYJSONDecoder` and the `.json5Allowed` option
-> on `YYJSONSerialization` will have no effect when this trait is enabled.
+When this trait is enabled, the following APIs become unavailable:
+
+- `YYJSONReadOptions.allowTrailingCommas`
+- `YYJSONReadOptions.allowComments`
+- `YYJSONReadOptions.allowInfAndNaN`
+- `YYJSONReadOptions.allowBOM`
+- `YYJSONReadOptions.allowExtendedNumbers`
+- `YYJSONReadOptions.allowExtendedEscapes`
+- `YYJSONReadOptions.allowExtendedWhitespace`
+- `YYJSONReadOptions.allowSingleQuotedStrings`
+- `YYJSONReadOptions.allowUnquotedKeys`
+- `YYJSONReadOptions.json5`
+- `YYJSONWriteOptions.allowInfAndNaN`
+- `YYJSONWriteOptions.infAndNaNAsNull`
+- `YYJSONDecoder.allowsJSON5`
+- `JSON5DecodingOptions`
+- `YYJSONSerialization.ReadingOptions.json5Allowed`
 
 ### `noUTF8Validation`
 
