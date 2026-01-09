@@ -22,7 +22,10 @@ import Foundation
         /// - Throws: `YYJSONError` if parsing fails.
         init(data: Data, options: YYJSONReadOptions = .default) throws {
             var error = yyjson_read_err()
-            let flags = options.yyjsonFlags
+            var flags = options.yyjsonFlags
+            // Mask out YYJSON_READ_INSITU to prevent use-after-free issues.
+            // In-place parsing must use the dedicated consuming initializer.
+            flags &= ~yyjson_read_flag(YYJSON_READ_INSITU)
 
             self.retainedData = nil
 
@@ -57,6 +60,10 @@ import Foundation
             var error = yyjson_read_err()
             var flags = options.yyjsonFlags
             flags |= YYJSON_READ_INSITU
+
+            if data.isEmpty {
+                throw YYJSONError.invalidJSON("Empty content")
+            }
 
             let paddingSize = Int(YYJSON_PADDING_SIZE)
             let originalCount = data.count
@@ -105,8 +112,9 @@ import Foundation
     ///
     /// ```swift
     /// let document = try YYJSONDocument(data: jsonData)
-    /// let root = document.root
-    /// print(root["name"]?.string ?? "unknown")
+    /// if let root = document.root {
+    ///     print(root["name"]?.string ?? "unknown")
+    /// }
     /// ```
     ///
     /// For highest performance with large documents,
@@ -162,21 +170,25 @@ import Foundation
         }
 
         /// The root value of the parsed JSON document.
-        public var root: YYJSONValue {
+        ///
+        /// Returns `nil` if the document has no root value.
+        public var root: YYJSONValue? {
             guard let root = _document.root else {
-                fatalError("Document has no root value")
+                return nil
             }
             return YYJSONValue(value: root, document: _document)
         }
 
-        /// The root value as an object, or `nil` if the root is not an object.
+        /// The root value as an object, or `nil` if the root is not an object
+        /// or if the document has no root value.
         public var rootObject: YYJSONObject? {
-            root.object
+            root?.object
         }
 
-        /// The root value as an array, or `nil` if the root is not an array.
+        /// The root value as an array, or `nil` if the root is not an array
+        /// or if the document has no root value.
         public var rootArray: YYJSONArray? {
-            root.array
+            root?.array
         }
     }
 
