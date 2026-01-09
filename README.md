@@ -22,6 +22,7 @@ using standard JSON test fixtures from
 | `twitter.json` (~632KB)      | ~180 μs |    ~2.9 ms |    ~16× |
 | `citm_catalog.json` (~1.7MB) | ~425 μs |    ~4.3 ms |    ~10× |
 | `canada.json` (~2.2MB)       | ~2.3 ms |   ~36.0 ms |    ~16× |
+| `tokenizer.json` (~11MB)     | ~6.5 ms |   ~57.0 ms |     ~9× |
 
 YYJSON also uses significantly less memory.
 Parsing twitter.json requires only 3 allocations compared to over 6,600 for Foundation,
@@ -42,35 +43,13 @@ see [swift-yyjson-benchmark](https://github.com/mattt/swift-yyjson-benchmark).
 <summary>Raw Results</summary>
 
 ```shell
-swift package benchmark --format markdown --filter "Fixture/.+" --time-units microseconds
+swift package benchmark --format markdown --filter "Fixture/.+/Parse/.+" --time-units microseconds
 ```
 
 ```console
 Host 'MacBook-Pro.local' with 16 'arm64' processors with 48 GB memory, running:
 Darwin Kernel Version 25.2.0: Tue Nov 18 21:09:56 PST 2025; root:xnu-12377.61.12~1/RELEASE_ARM64_T6041
 ```
-
-### Fixture/canada.json/Access/Foundation
-
-| Metric                     |    p0 |   p25 |   p50 |   p75 |   p90 |   p99 |  p100 | Samples |
-| :------------------------- | ----: | ----: | ----: | ----: | ----: | ----: | ----: | ------: |
-| Instructions (M) \*        |   971 |   972 |   972 |   972 |   974 |   978 |   978 |      29 |
-| Malloc (total) (K) \*      |   224 |   224 |   224 |   224 |   224 |   224 |   224 |      29 |
-| Memory (resident peak) (M) |    31 |    79 |   128 |   176 |   210 |   224 |   224 |      29 |
-| Throughput (# / s) (#)     |    29 |    29 |    28 |    28 |    28 |    26 |    26 |      29 |
-| Time (total CPU) (μs) \*   | 34183 | 34800 | 35455 | 35619 | 36078 | 37996 | 37996 |      29 |
-| Time (wall clock) (μs) \*  | 34180 | 34800 | 35455 | 35586 | 36045 | 37976 | 37976 |      29 |
-
-### Fixture/canada.json/Access/YYJSON
-
-| Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 | p100 | Samples |
-| :------------------------- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ------: |
-| Instructions (M) \*        |   58 |   58 |   58 |   58 |   58 |   58 |   59 |     455 |
-| Malloc (total) \*          |    6 |    6 |    6 |    6 |    6 |    6 |    6 |     455 |
-| Memory (resident peak) (M) |   17 |   22 |   22 |   22 |   22 |   22 |   22 |     455 |
-| Throughput (# / s) (#)     |  481 |  462 |  458 |  455 |  451 |  435 |  419 |     455 |
-| Time (total CPU) (μs) \*   | 2082 | 2167 | 2185 | 2202 | 2224 | 2300 | 2403 |     455 |
-| Time (wall clock) (μs) \*  | 2080 | 2167 | 2183 | 2200 | 2220 | 2298 | 2387 |     455 |
 
 ### Fixture/canada.json/Parse/Foundation
 
@@ -94,39 +73,6 @@ Darwin Kernel Version 25.2.0: Tue Nov 18 21:09:56 PST 2025; root:xnu-12377.61.12
 | Time (total CPU) (μs) \*   | 1163 | 1236 | 1249 | 1261 | 1274 | 1318 | 1344 |     790 |
 | Time (wall clock) (μs) \*  | 1162 | 1234 | 1247 | 1258 | 1271 | 1316 | 1342 |     790 |
 
-### Fixture/canada.json/Parse/YYJSON+in-place
-
-| Metric                     |  p0 | p25 | p50 | p75 | p90 | p99 | p100 | Samples |
-| :------------------------- | --: | --: | --: | --: | --: | --: | ---: | ------: |
-| Instructions (K) \*        |  35 |  35 |  35 |  35 |  35 |  35 |   35 |       1 |
-| Malloc (total) \*          |   0 |   0 |   0 |   0 |   0 |   0 |    0 |       1 |
-| Memory (resident peak) (M) |  24 |  24 |  24 |  24 |  24 |  24 |   24 |       1 |
-| Throughput (# / s) (K)     | 792 | 792 | 792 | 792 | 792 | 792 |  792 |       1 |
-| Time (total CPU) (μs) \*   |   1 |   1 |   1 |   1 |   1 |   1 |    1 |       1 |
-| Time (wall clock) (μs) \*  |   1 |   1 |   1 |   1 |   1 |   1 |    1 |       1 |
-
-### Fixture/citm_catalog.json/Access/Foundation
-
-| Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 | p100 | Samples |
-| :------------------------- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ------: |
-| Instructions (M) \*        |   94 |   94 |   94 |   94 |   94 |   95 |   96 |     238 |
-| Malloc (total) (K) \*      |   15 |   15 |   15 |   15 |   15 |   15 |   15 |     238 |
-| Memory (resident peak) (M) |   19 |   76 |  132 |  189 |  226 |  246 |  246 |     238 |
-| Throughput (# / s) (#)     |  246 |  241 |  239 |  237 |  235 |  229 |  228 |     238 |
-| Time (total CPU) (μs) \*   | 4061 | 4155 | 4192 | 4231 | 4260 | 4362 | 4380 |     238 |
-| Time (wall clock) (μs) \*  | 4060 | 4153 | 4190 | 4227 | 4260 | 4362 | 4378 |     238 |
-
-### Fixture/citm_catalog.json/Access/YYJSON
-
-| Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 | p100 | Samples |
-| :------------------------- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ------: |
-| Instructions (M) \*        |   12 |   12 |   12 |   12 |   12 |   12 |   13 |    2311 |
-| Malloc (total) \*          | 1640 | 1640 | 1640 | 1640 | 1640 | 1640 | 1640 |    2311 |
-| Memory (resident peak) (M) |   18 |   22 |   22 |   22 |   22 |   22 |   22 |    2311 |
-| Throughput (# / s) (#)     | 2599 | 2439 | 2409 | 2383 | 2361 | 2265 | 2094 |    2311 |
-| Time (total CPU) (μs) \*   |  386 |  412 |  417 |  421 |  425 |  443 |  479 |    2311 |
-| Time (wall clock) (μs) \*  |  385 |  410 |  415 |  420 |  424 |  442 |  478 |    2311 |
-
 ### Fixture/citm_catalog.json/Parse/Foundation
 
 | Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 | p100 | Samples |
@@ -148,39 +94,6 @@ Darwin Kernel Version 25.2.0: Tue Nov 18 21:09:56 PST 2025; root:xnu-12377.61.12
 | Throughput (# / s) (#)     | 3253 | 3075 | 3025 | 2973 | 2929 | 2801 |  2590 |    2871 |
 | Time (total CPU) (μs) \*   |  309 |  327 |  332 |  338 |  343 |  359 |   392 |    2871 |
 | Time (wall clock) (μs) \*  |  307 |  325 |  331 |  336 |  342 |  357 |   386 |    2871 |
-
-### Fixture/citm_catalog.json/Parse/YYJSON+in-place
-
-| Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 | p100 | Samples |
-| :------------------------- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ------: |
-| Instructions \*            | 9862 | 9863 | 9863 | 9863 | 9863 | 9863 | 9863 |       3 |
-| Malloc (total) \*          |    0 |    0 |    0 |    0 |    0 |    0 |    0 |       3 |
-| Memory (resident peak) (M) |   21 |   21 |   23 |   23 |   23 |   23 |   23 |       3 |
-| Throughput (# / s) (K)     | 3186 | 3186 | 3009 | 2857 | 2857 | 2857 | 2857 |       3 |
-| Time (total CPU) (μs) \*   |    0 |    0 |    0 |    0 |    0 |    0 |    0 |       3 |
-| Time (wall clock) (μs) \*  |    0 |    0 |    0 |    0 |    0 |    0 |    0 |       3 |
-
-### Fixture/twitter.json/Access/Foundation
-
-| Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 | p100 | Samples |
-| :------------------------- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ------: |
-| Instructions (M) \*        |   63 |   64 |   64 |   64 |   65 |   66 |   66 |     344 |
-| Malloc (total) \*          | 6938 | 6939 | 6939 | 6939 | 6939 | 6939 | 6939 |     344 |
-| Memory (resident peak) (M) |   19 |   79 |  142 |  204 |  240 |  262 |  265 |     344 |
-| Throughput (# / s) (#)     |  364 |  353 |  348 |  343 |  338 |  310 |  298 |     344 |
-| Time (total CPU) (μs) \*   | 2750 | 2836 | 2871 | 2914 | 2963 | 3232 | 3365 |     344 |
-| Time (wall clock) (μs) \*  | 2749 | 2832 | 2869 | 2912 | 2961 | 3228 | 3356 |     344 |
-
-### Fixture/twitter.json/Access/YYJSON
-
-| Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 | p100 | Samples |
-| :------------------------- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ------: |
-| Instructions (K) \*        | 4657 | 4657 | 4657 | 4657 | 4657 | 4674 | 5102 |    4986 |
-| Malloc (total) \*          |  604 |  604 |  604 |  604 |  604 |  604 |  604 |    4986 |
-| Memory (resident peak) (M) |   17 |   19 |   19 |   19 |   19 |   19 |   19 |    4986 |
-| Throughput (# / s) (#)     | 5930 | 5843 | 5691 | 5383 | 5219 | 4727 | 3976 |    4986 |
-| Time (total CPU) (μs) \*   |  170 |  173 |  177 |  187 |  194 |  214 |  257 |    4986 |
-| Time (wall clock) (μs) \*  |  169 |  171 |  176 |  186 |  192 |  212 |  252 |    4986 |
 
 ### Fixture/twitter.json/Parse/Foundation
 
@@ -204,16 +117,27 @@ Darwin Kernel Version 25.2.0: Tue Nov 18 21:09:56 PST 2025; root:xnu-12377.61.12
 | Time (total CPU) (μs) \*   |  118 |  124 |  130 |  137 |  139 |  152 |  339 |    6785 |
 | Time (wall clock) (μs) \*  |  117 |  122 |  128 |  135 |  138 |  150 |  420 |    6785 |
 
-### Fixture/twitter.json/Parse/YYJSON+in-place
+### Fixture/tokenizer.json/Parse/Foundation
+
+| Metric                     |    p0 |   p25 |   p50 |   p75 |   p90 |   p99 |  p100 | Samples |
+| :------------------------- | ----: | ----: | ----: | ----: | ----: | ----: | ----: | ------: |
+| Instructions (M) \*        |  1212 |  1213 |  1213 |  1213 |  1213 |  1215 |  1215 |      18 |
+| Malloc (total) (K) \*      |   382 |   382 |   382 |   382 |   382 |   382 |   382 |      18 |
+| Memory (resident peak) (M) |    74 |   158 |   242 |   344 |   407 |   430 |   430 |      18 |
+| Throughput (# / s) (#)     |    18 |    18 |    17 |    17 |    17 |    17 |    17 |      18 |
+| Time (total CPU) (μs) \*   | 54226 | 56001 | 56984 | 57541 | 58950 | 59070 | 59070 |      18 |
+| Time (wall clock) (μs) \*  | 54202 | 56001 | 56951 | 57541 | 58917 | 59050 | 59050 |      18 |
+
+### Fixture/tokenizer.json/Parse/YYJSON
 
 | Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 | p100 | Samples |
 | :------------------------- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ------: |
-| Instructions \*            | 3520 | 3522 | 3522 | 3522 | 3522 | 3522 | 3522 |       7 |
-| Malloc (total) \*          |    0 |    0 |    0 |    0 |    0 |    0 |    0 |       7 |
-| Memory (resident peak) (M) |   19 |   20 |   20 |   20 |   20 |   20 |   20 |       7 |
-| Throughput (# / s) (K)     | 8197 | 8087 | 7567 | 7419 | 7219 | 7219 | 7216 |       7 |
-| Time (total CPU) (μs) \*   |    0 |    0 |    0 |    0 |    0 |    0 |    0 |       7 |
-| Time (wall clock) (μs) \*  |    0 |    0 |    0 |    0 |    0 |    0 |    0 |       7 |
+| Instructions (M) \*        |  105 |  105 |  105 |  106 |  106 |  106 |  106 |     153 |
+| Malloc (total) \*          |    4 |    4 |    4 |    4 |    4 |    4 |    4 |     153 |
+| Memory (resident peak) (M) |   28 |   52 |   52 |   52 |   52 |   52 |   52 |     153 |
+| Throughput (# / s) (#)     |  158 |  154 |  153 |  153 |  152 |  147 |  127 |     153 |
+| Time (total CPU) (μs) \*   | 6316 | 6480 | 6525 | 6562 | 6607 | 6754 | 7863 |     153 |
+| Time (wall clock) (μs) \*  | 6315 | 6476 | 6521 | 6554 | 6599 | 6816 | 7857 |     153 |
 
 </details>
 
