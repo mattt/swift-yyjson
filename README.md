@@ -9,6 +9,214 @@ It supports configurable compile-time options via
 [Swift package traits](https://docs.swift.org/swiftpm/documentation/packagemanagerdocs/packagetraits/)
 for further optimization.
 
+## Benchmarks
+
+YYJSON delivers significant performance improvements
+over Foundation's JSON APIs.
+These benchmarks compare parsing times
+using standard JSON test fixtures from
+[nativejson-benchmark](https://github.com/miloyip/nativejson-benchmark).
+
+| Fixture                      |  YYJSON | Foundation | Speedup |
+| :--------------------------- | ------: | ---------: | ------: |
+| `twitter.json` (~632KB)      | ~180 μs |    ~2.9 ms |    ~16× |
+| `citm_catalog.json` (~1.7MB) | ~425 μs |    ~4.3 ms |    ~10× |
+| `canada.json` (~2.2MB)       | ~2.3 ms |   ~36.0 ms |    ~16× |
+
+YYJSON also uses significantly less memory.
+Parsing twitter.json requires only 3 allocations compared to over 6,600 for Foundation,
+with peak memory of 19 MB versus up to 378 MB.
+For maximum efficiency,
+[in-place parsing](#in-place-parsing)
+eliminates allocations entirely by operating directly on the input buffer.
+
+The performance advantage is most pronounced for large files,
+access-heavy workloads where YYJSON's value-based API avoids repeated type casting,
+and number-heavy data like GeoJSON that benefits from optimized floating-point parsing.
+
+For detailed methodology and additional benchmarks,
+see [swift-yyjson-benchmark](https://github.com/mattt/swift-yyjson-benchmark).
+
+<details>
+
+<summary>Raw Results</summary>
+
+```shell
+swift package benchmark --format markdown --filter "Fixture/.+" --time-units microseconds
+```
+
+```console
+Host 'MacBook-Pro.local' with 16 'arm64' processors with 48 GB memory, running:
+Darwin Kernel Version 25.2.0: Tue Nov 18 21:09:56 PST 2025; root:xnu-12377.61.12~1/RELEASE_ARM64_T6041
+```
+
+### Fixture/canada.json/Access/Foundation
+
+| Metric                     |    p0 |   p25 |   p50 |   p75 |   p90 |   p99 |  p100 | Samples |
+| :------------------------- | ----: | ----: | ----: | ----: | ----: | ----: | ----: | ------: |
+| Instructions (M) \*        |   971 |   972 |   972 |   972 |   974 |   978 |   978 |      29 |
+| Malloc (total) (K) \*      |   224 |   224 |   224 |   224 |   224 |   224 |   224 |      29 |
+| Memory (resident peak) (M) |    31 |    79 |   128 |   176 |   210 |   224 |   224 |      29 |
+| Throughput (# / s) (#)     |    29 |    29 |    28 |    28 |    28 |    26 |    26 |      29 |
+| Time (total CPU) (μs) \*   | 34183 | 34800 | 35455 | 35619 | 36078 | 37996 | 37996 |      29 |
+| Time (wall clock) (μs) \*  | 34180 | 34800 | 35455 | 35586 | 36045 | 37976 | 37976 |      29 |
+
+### Fixture/canada.json/Access/YYJSON
+
+| Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 | p100 | Samples |
+| :------------------------- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ------: |
+| Instructions (M) \*        |   58 |   58 |   58 |   58 |   58 |   58 |   59 |     455 |
+| Malloc (total) \*          |    6 |    6 |    6 |    6 |    6 |    6 |    6 |     455 |
+| Memory (resident peak) (M) |   17 |   22 |   22 |   22 |   22 |   22 |   22 |     455 |
+| Throughput (# / s) (#)     |  481 |  462 |  458 |  455 |  451 |  435 |  419 |     455 |
+| Time (total CPU) (μs) \*   | 2082 | 2167 | 2185 | 2202 | 2224 | 2300 | 2403 |     455 |
+| Time (wall clock) (μs) \*  | 2080 | 2167 | 2183 | 2200 | 2220 | 2298 | 2387 |     455 |
+
+### Fixture/canada.json/Parse/Foundation
+
+| Metric                     |    p0 |   p25 |   p50 |   p75 |   p90 |   p99 |  p100 | Samples |
+| :------------------------- | ----: | ----: | ----: | ----: | ----: | ----: | ----: | ------: |
+| Instructions (M) \*        |   308 |   308 |   308 |   308 |   309 |   312 |   312 |      85 |
+| Malloc (total) (K) \*      |   167 |   167 |   167 |   167 |   167 |   167 |   167 |      85 |
+| Memory (resident peak) (M) |    17 |   148 |   274 |   394 |   478 |   524 |   524 |      85 |
+| Throughput (# / s) (#)     |    88 |    85 |    85 |    84 |    83 |    82 |    82 |      85 |
+| Time (total CPU) (μs) \*   | 11425 | 11731 | 11821 | 11969 | 12034 | 12234 | 12234 |      85 |
+| Time (wall clock) (μs) \*  | 11419 | 11723 | 11821 | 11969 | 12034 | 12227 | 12227 |      85 |
+
+### Fixture/canada.json/Parse/YYJSON
+
+| Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 | p100 | Samples |
+| :------------------------- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ------: |
+| Instructions (M) \*        |   35 |   35 |   35 |   35 |   35 |   35 |   35 |     790 |
+| Malloc (total) \*          |    3 |    3 |    3 |    3 |    3 |    3 |    3 |     790 |
+| Memory (resident peak) (M) |   17 |   22 |   22 |   22 |   22 |   22 |   22 |     790 |
+| Throughput (# / s) (#)     |  861 |  810 |  802 |  795 |  787 |  760 |  745 |     790 |
+| Time (total CPU) (μs) \*   | 1163 | 1236 | 1249 | 1261 | 1274 | 1318 | 1344 |     790 |
+| Time (wall clock) (μs) \*  | 1162 | 1234 | 1247 | 1258 | 1271 | 1316 | 1342 |     790 |
+
+### Fixture/canada.json/Parse/YYJSON+in-place
+
+| Metric                     |  p0 | p25 | p50 | p75 | p90 | p99 | p100 | Samples |
+| :------------------------- | --: | --: | --: | --: | --: | --: | ---: | ------: |
+| Instructions (K) \*        |  35 |  35 |  35 |  35 |  35 |  35 |   35 |       1 |
+| Malloc (total) \*          |   0 |   0 |   0 |   0 |   0 |   0 |    0 |       1 |
+| Memory (resident peak) (M) |  24 |  24 |  24 |  24 |  24 |  24 |   24 |       1 |
+| Throughput (# / s) (K)     | 792 | 792 | 792 | 792 | 792 | 792 |  792 |       1 |
+| Time (total CPU) (μs) \*   |   1 |   1 |   1 |   1 |   1 |   1 |    1 |       1 |
+| Time (wall clock) (μs) \*  |   1 |   1 |   1 |   1 |   1 |   1 |    1 |       1 |
+
+### Fixture/citm_catalog.json/Access/Foundation
+
+| Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 | p100 | Samples |
+| :------------------------- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ------: |
+| Instructions (M) \*        |   94 |   94 |   94 |   94 |   94 |   95 |   96 |     238 |
+| Malloc (total) (K) \*      |   15 |   15 |   15 |   15 |   15 |   15 |   15 |     238 |
+| Memory (resident peak) (M) |   19 |   76 |  132 |  189 |  226 |  246 |  246 |     238 |
+| Throughput (# / s) (#)     |  246 |  241 |  239 |  237 |  235 |  229 |  228 |     238 |
+| Time (total CPU) (μs) \*   | 4061 | 4155 | 4192 | 4231 | 4260 | 4362 | 4380 |     238 |
+| Time (wall clock) (μs) \*  | 4060 | 4153 | 4190 | 4227 | 4260 | 4362 | 4378 |     238 |
+
+### Fixture/citm_catalog.json/Access/YYJSON
+
+| Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 | p100 | Samples |
+| :------------------------- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ------: |
+| Instructions (M) \*        |   12 |   12 |   12 |   12 |   12 |   12 |   13 |    2311 |
+| Malloc (total) \*          | 1640 | 1640 | 1640 | 1640 | 1640 | 1640 | 1640 |    2311 |
+| Memory (resident peak) (M) |   18 |   22 |   22 |   22 |   22 |   22 |   22 |    2311 |
+| Throughput (# / s) (#)     | 2599 | 2439 | 2409 | 2383 | 2361 | 2265 | 2094 |    2311 |
+| Time (total CPU) (μs) \*   |  386 |  412 |  417 |  421 |  425 |  443 |  479 |    2311 |
+| Time (wall clock) (μs) \*  |  385 |  410 |  415 |  420 |  424 |  442 |  478 |    2311 |
+
+### Fixture/citm_catalog.json/Parse/Foundation
+
+| Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 | p100 | Samples |
+| :------------------------- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ------: |
+| Instructions (M) \*        |   73 |   73 |   73 |   73 |   73 |   73 |   74 |     297 |
+| Malloc (total) (K) \*      |   14 |   14 |   14 |   14 |   14 |   14 |   14 |     297 |
+| Memory (resident peak) (M) |   18 |   90 |  161 |  230 |  276 |  301 |  301 |     297 |
+| Throughput (# / s) (#)     |  312 |  304 |  301 |  296 |  284 |  276 |  273 |     297 |
+| Time (total CPU) (μs) \*   | 3205 | 3293 | 3330 | 3383 | 3521 | 3633 | 3660 |     297 |
+| Time (wall clock) (μs) \*  | 3203 | 3291 | 3328 | 3381 | 3518 | 3629 | 3659 |     297 |
+
+### Fixture/citm_catalog.json/Parse/YYJSON
+
+| Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 |  p100 | Samples |
+| :------------------------- | ---: | ---: | ---: | ---: | ---: | ---: | ----: | ------: |
+| Instructions (K) \*        | 9850 | 9855 | 9855 | 9855 | 9855 | 9871 | 10528 |    2871 |
+| Malloc (total) \*          |    3 |    3 |    3 |    3 |    3 |    3 |     3 |    2871 |
+| Memory (resident peak) (M) |   18 |   22 |   22 |   22 |   22 |   22 |    22 |    2871 |
+| Throughput (# / s) (#)     | 3253 | 3075 | 3025 | 2973 | 2929 | 2801 |  2590 |    2871 |
+| Time (total CPU) (μs) \*   |  309 |  327 |  332 |  338 |  343 |  359 |   392 |    2871 |
+| Time (wall clock) (μs) \*  |  307 |  325 |  331 |  336 |  342 |  357 |   386 |    2871 |
+
+### Fixture/citm_catalog.json/Parse/YYJSON+in-place
+
+| Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 | p100 | Samples |
+| :------------------------- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ------: |
+| Instructions \*            | 9862 | 9863 | 9863 | 9863 | 9863 | 9863 | 9863 |       3 |
+| Malloc (total) \*          |    0 |    0 |    0 |    0 |    0 |    0 |    0 |       3 |
+| Memory (resident peak) (M) |   21 |   21 |   23 |   23 |   23 |   23 |   23 |       3 |
+| Throughput (# / s) (K)     | 3186 | 3186 | 3009 | 2857 | 2857 | 2857 | 2857 |       3 |
+| Time (total CPU) (μs) \*   |    0 |    0 |    0 |    0 |    0 |    0 |    0 |       3 |
+| Time (wall clock) (μs) \*  |    0 |    0 |    0 |    0 |    0 |    0 |    0 |       3 |
+
+### Fixture/twitter.json/Access/Foundation
+
+| Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 | p100 | Samples |
+| :------------------------- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ------: |
+| Instructions (M) \*        |   63 |   64 |   64 |   64 |   65 |   66 |   66 |     344 |
+| Malloc (total) \*          | 6938 | 6939 | 6939 | 6939 | 6939 | 6939 | 6939 |     344 |
+| Memory (resident peak) (M) |   19 |   79 |  142 |  204 |  240 |  262 |  265 |     344 |
+| Throughput (# / s) (#)     |  364 |  353 |  348 |  343 |  338 |  310 |  298 |     344 |
+| Time (total CPU) (μs) \*   | 2750 | 2836 | 2871 | 2914 | 2963 | 3232 | 3365 |     344 |
+| Time (wall clock) (μs) \*  | 2749 | 2832 | 2869 | 2912 | 2961 | 3228 | 3356 |     344 |
+
+### Fixture/twitter.json/Access/YYJSON
+
+| Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 | p100 | Samples |
+| :------------------------- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ------: |
+| Instructions (K) \*        | 4657 | 4657 | 4657 | 4657 | 4657 | 4674 | 5102 |    4986 |
+| Malloc (total) \*          |  604 |  604 |  604 |  604 |  604 |  604 |  604 |    4986 |
+| Memory (resident peak) (M) |   17 |   19 |   19 |   19 |   19 |   19 |   19 |    4986 |
+| Throughput (# / s) (#)     | 5930 | 5843 | 5691 | 5383 | 5219 | 4727 | 3976 |    4986 |
+| Time (total CPU) (μs) \*   |  170 |  173 |  177 |  187 |  194 |  214 |  257 |    4986 |
+| Time (wall clock) (μs) \*  |  169 |  171 |  176 |  186 |  192 |  212 |  252 |    4986 |
+
+### Fixture/twitter.json/Parse/Foundation
+
+| Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 | p100 | Samples |
+| :------------------------- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ------: |
+| Instructions (M) \*        |   44 |   44 |   44 |   44 |   44 |   44 |   44 |     501 |
+| Malloc (total) \*          | 6636 | 6637 | 6637 | 6637 | 6637 | 6637 | 6637 |     501 |
+| Memory (resident peak) (M) |   18 |  108 |  198 |  285 |  342 |  374 |  378 |     501 |
+| Throughput (# / s) (#)     |  531 |  514 |  510 |  505 |  492 |  455 |  436 |     501 |
+| Time (total CPU) (μs) \*   | 1887 | 1946 | 1964 | 1985 | 2032 | 2198 | 2296 |     501 |
+| Time (wall clock) (μs) \*  | 1883 | 1945 | 1962 | 1982 | 2032 | 2198 | 2294 |     501 |
+
+### Fixture/twitter.json/Parse/YYJSON
+
+| Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 | p100 | Samples |
+| :------------------------- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ------: |
+| Instructions (K) \*        | 3509 | 3510 | 3510 | 3510 | 3510 | 3527 | 3941 |    6785 |
+| Malloc (total) \*          |    3 |    3 |    3 |    3 |    3 |    3 |    3 |    6785 |
+| Memory (resident peak) (M) |   17 |   19 |   19 |   19 |   19 |   19 |   19 |    6785 |
+| Throughput (# / s) (#)     | 8544 | 8179 | 7791 | 7399 | 7267 | 6687 | 2383 |    6785 |
+| Time (total CPU) (μs) \*   |  118 |  124 |  130 |  137 |  139 |  152 |  339 |    6785 |
+| Time (wall clock) (μs) \*  |  117 |  122 |  128 |  135 |  138 |  150 |  420 |    6785 |
+
+### Fixture/twitter.json/Parse/YYJSON+in-place
+
+| Metric                     |   p0 |  p25 |  p50 |  p75 |  p90 |  p99 | p100 | Samples |
+| :------------------------- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ------: |
+| Instructions \*            | 3520 | 3522 | 3522 | 3522 | 3522 | 3522 | 3522 |       7 |
+| Malloc (total) \*          |    0 |    0 |    0 |    0 |    0 |    0 |    0 |       7 |
+| Memory (resident peak) (M) |   19 |   20 |   20 |   20 |   20 |   20 |   20 |       7 |
+| Throughput (# / s) (K)     | 8197 | 8087 | 7567 | 7419 | 7219 | 7219 | 7216 |       7 |
+| Time (total CPU) (μs) \*   |    0 |    0 |    0 |    0 |    0 |    0 |    0 |       7 |
+| Time (wall clock) (μs) \*  |    0 |    0 |    0 |    0 |    0 |    0 |    0 |       7 |
+
+</details>
+
 ## Requirements
 
 - Swift 6.1+ / Xcode 16+
