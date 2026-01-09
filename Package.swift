@@ -66,7 +66,6 @@ let package = Package(
                     to: "1",
                     .when(traits: ["noUTF8Validation"])
                 ),
-                .unsafeFlags(["-O3", "-flto"], .when(configuration: .release)),
             ]
         ),
         .target(
