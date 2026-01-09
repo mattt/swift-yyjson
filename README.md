@@ -26,8 +26,9 @@ using standard JSON test fixtures from
 YYJSON also uses significantly less memory.
 Parsing twitter.json requires only 3 allocations compared to over 6,600 for Foundation,
 with peak memory of 19 MB versus up to 378 MB.
-For maximum efficiency, in-place parsing eliminates allocations entirely
-by operating directly on the input buffer.
+For maximum efficiency,
+[in-place parsing](#in-place-parsing)
+eliminates allocations entirely by operating directly on the input buffer.
 
 The performance advantage is most pronounced for large files,
 access-heavy workloads where YYJSON's value-based API avoids repeated type casting,
