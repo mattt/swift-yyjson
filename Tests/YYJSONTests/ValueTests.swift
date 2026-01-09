@@ -533,6 +533,168 @@ import Testing
         }
     }
 
+    // MARK: - YYJSONValue cString Tests
+
+    @Suite("YYJSONValue - cString Property")
+    struct ValueCStringTests {
+        @Test func cStringForBasicString() throws {
+            let value = try YYJSONValue(string: #""hello world""#)
+            guard let cString = value.cString else {
+                Issue.record("Expected cString to be non-nil for string value")
+                return
+            }
+            let swiftString = String(cString: cString)
+            #expect(swiftString == "hello world")
+        }
+
+        @Test func cStringForEmptyString() throws {
+            let value = try YYJSONValue(string: #""""#)
+            guard let cString = value.cString else {
+                Issue.record("Expected cString to be non-nil for empty string")
+                return
+            }
+            let swiftString = String(cString: cString)
+            #expect(swiftString == "")
+        }
+
+        @Test func cStringForUnicodeString() throws {
+            let value = try YYJSONValue(string: #""Hello 你好 🌍""#)
+            guard let cString = value.cString else {
+                Issue.record("Expected cString to be non-nil for Unicode string")
+                return
+            }
+            let swiftString = String(cString: cString)
+            #expect(swiftString == "Hello 你好 🌍")
+        }
+
+        @Test func cStringForStringWithEscapes() throws {
+            let value = try YYJSONValue(string: #""line1\nline2\ttab""#)
+            guard let cString = value.cString else {
+                Issue.record("Expected cString to be non-nil for string with escapes")
+                return
+            }
+            let swiftString = String(cString: cString)
+            #expect(swiftString == "line1\nline2\ttab")
+        }
+
+        @Test func cStringForStringWithQuotes() throws {
+            let value = try YYJSONValue(string: #""say \"hello\"""#)
+            guard let cString = value.cString else {
+                Issue.record("Expected cString to be non-nil for string with quotes")
+                return
+            }
+            let swiftString = String(cString: cString)
+            #expect(swiftString == #"say "hello""#)
+        }
+
+        @Test func cStringForNull() throws {
+            let value = try YYJSONValue(string: "null")
+            #expect(value.cString == nil)
+        }
+
+        @Test func cStringForBool() throws {
+            let trueValue = try YYJSONValue(string: "true")
+            let falseValue = try YYJSONValue(string: "false")
+            #expect(trueValue.cString == nil)
+            #expect(falseValue.cString == nil)
+        }
+
+        @Test func cStringForNumber() throws {
+            let intValue = try YYJSONValue(string: "42")
+            let floatValue = try YYJSONValue(string: "3.14")
+            #expect(intValue.cString == nil)
+            #expect(floatValue.cString == nil)
+        }
+
+        @Test func cStringForArray() throws {
+            let value = try YYJSONValue(string: "[1, 2, 3]")
+            #expect(value.cString == nil)
+        }
+
+        @Test func cStringForObject() throws {
+            let value = try YYJSONValue(string: #"{"key": "value"}"#)
+            #expect(value.cString == nil)
+        }
+
+        @Test func cStringMatchesStringProperty() throws {
+            let testCases: [(json: String, expected: String)] = [
+                (#""hello world""#, "hello world"),
+                (#""""#, ""),
+                (#""Hello 你好 🌍""#, "Hello 你好 🌍"),
+                (#""line1\nline2\ttab""#, "line1\nline2\ttab"),
+                (#""say \"hello\"""#, #"say "hello""#),
+            ]
+
+            for (json, expected) in testCases {
+                let value = try YYJSONValue(string: json)
+                guard let cString = value.cString else {
+                    Issue.record("Expected cString for: \(expected)")
+                    continue
+                }
+                let cStringValue = String(cString: cString)
+                let stringValue = value.string
+                #expect(cStringValue == expected)
+                #expect(cStringValue == stringValue)
+            }
+        }
+
+        @Test func cStringPointerIsValid() throws {
+            let value = try YYJSONValue(string: #""test string""#)
+            guard let cString = value.cString else {
+                Issue.record("Expected cString to be non-nil")
+                return
+            }
+
+            // Verify the pointer is valid by reading from it
+            let length = strlen(cString)
+            #expect(length == 11)  // "test string" length
+
+            // Verify we can read the entire string (excluding null terminator)
+            let buffer = UnsafeBufferPointer(start: cString, count: length)
+            let data = Data(buffer: buffer)
+            let reconstructed = String(data: data, encoding: .utf8)
+            #expect(reconstructed == "test string")
+        }
+
+        @Test func cStringInNestedStructure() throws {
+            let json = #"{"name": "Alice", "message": "Hello\nWorld"}"#
+            let value = try YYJSONValue(string: json)
+
+            guard let nameCString = value["name"]?.cString else {
+                Issue.record("Expected cString for name")
+                return
+            }
+            #expect(String(cString: nameCString) == "Alice")
+
+            guard let messageCString = value["message"]?.cString else {
+                Issue.record("Expected cString for message")
+                return
+            }
+            #expect(String(cString: messageCString) == "Hello\nWorld")
+        }
+
+        @Test func cStringInArray() throws {
+            let json = #"["first", "second", "third"]"#
+            let value = try YYJSONValue(string: json)
+            guard let array = value.array else {
+                Issue.record("Expected array")
+                return
+            }
+
+            guard let firstCString = array[0]?.cString else {
+                Issue.record("Expected cString for first element")
+                return
+            }
+            #expect(String(cString: firstCString) == "first")
+
+            guard let secondCString = array[1]?.cString else {
+                Issue.record("Expected cString for second element")
+                return
+            }
+            #expect(String(cString: secondCString) == "second")
+        }
+    }
+
     // MARK: - In-Situ Parsing Tests
 
     @Suite("YYJSONValue - In-Situ Parsing")
