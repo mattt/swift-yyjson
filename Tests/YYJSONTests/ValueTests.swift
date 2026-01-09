@@ -695,16 +695,247 @@ import Testing
         }
     }
 
-    // MARK: - In-Situ Parsing Tests
+    // MARK: - In-Place Parsing Tests
 
-    @Suite("YYJSONValue - In-Situ Parsing")
-    struct ValueInSituTests {
-        @Test func parseWithInSitu() throws {
+    @Suite("YYJSONValue - In-Place Parsing")
+    struct ValueInPlaceTests {
+        @Test func parseInPlace() throws {
             let json = #"{"name": "test", "value": 42}"#
-            let data = json.data(using: .utf8)!
-            let value = try YYJSONValue(data: data, options: .inSitu)
+            var data = json.data(using: .utf8)!
+            let value = try YYJSONValue.parseInPlace(consuming: &data)
             #expect(value["name"]?.string == "test")
             #expect(value["value"]?.number == 42.0)
+        }
+
+        @Test func parseInPlaceEmptyData() throws {
+            var data = Data()
+            #expect(throws: YYJSONError.self) {
+                _ = try YYJSONValue.parseInPlace(consuming: &data)
+            }
+        }
+
+        @Test func parseInPlaceInvalidJSON() throws {
+            var data = "not valid json".data(using: .utf8)!
+            #expect(throws: YYJSONError.self) {
+                _ = try YYJSONValue.parseInPlace(consuming: &data)
+            }
+        }
+
+        @Test func parseInPlaceArray() throws {
+            let json = "[1, 2, 3, 4, 5]"
+            var data = json.data(using: .utf8)!
+            let value = try YYJSONValue.parseInPlace(consuming: &data)
+            guard let array = value.array else {
+                Issue.record("Expected array")
+                return
+            }
+            #expect(array.count == 5)
+            #expect(array[0]?.number == 1.0)
+            #expect(array[4]?.number == 5.0)
+        }
+
+        @Test func parseInPlacePrimitive() throws {
+            var data = "42".data(using: .utf8)!
+            let value = try YYJSONValue.parseInPlace(consuming: &data)
+            #expect(value.number == 42.0)
+        }
+
+        @Test func parseInPlaceString() throws {
+            var data = #""hello world""#.data(using: .utf8)!
+            let value = try YYJSONValue.parseInPlace(consuming: &data)
+            #expect(value.string == "hello world")
+        }
+
+        @Test func parseInPlaceDataRetained() throws {
+            let json = #"{"key": "value"}"#
+            var data = json.data(using: .utf8)!
+            let value = try YYJSONValue.parseInPlace(consuming: &data)
+            // Verify the value is still accessible after data is consumed
+            #expect(value["key"]?.string == "value")
+            // Access multiple times to ensure data is retained
+            #expect(value["key"]?.string == "value")
+            #expect(value["key"]?.string == "value")
+        }
+    }
+
+    // MARK: - YYJSONDocument Tests
+
+    @Suite("YYJSONDocument - Initialization")
+    struct YYJSONDocumentInitTests {
+        @Test func initFromData() throws {
+            let json = #"{"name": "Alice", "age": 30}"#
+            let data = json.data(using: .utf8)!
+            let document = try YYJSONDocument(data: data)
+            #expect(document.root != nil)
+            #expect(document.root?["name"]?.string == "Alice")
+            #expect(document.root?["age"]?.number == 30.0)
+        }
+
+        @Test func initFromString() throws {
+            let json = #"{"key": "value"}"#
+            let document = try YYJSONDocument(string: json)
+            #expect(document.root != nil)
+            #expect(document.root?["key"]?.string == "value")
+        }
+
+        @Test func initFromDataWithOptions() throws {
+            let json = #"{"key": "value"}"#
+            let data = json.data(using: .utf8)!
+            let document = try YYJSONDocument(data: data, options: .default)
+            #expect(document.root != nil)
+            #expect(document.root?["key"]?.string == "value")
+        }
+
+        @Test func initFromStringWithOptions() throws {
+            let json = #"{"key": "value"}"#
+            let document = try YYJSONDocument(string: json, options: .default)
+            #expect(document.root != nil)
+            #expect(document.root?["key"]?.string == "value")
+        }
+
+        @Test func initFromEmptyData() throws {
+            let data = Data()
+            #expect(throws: YYJSONError.self) {
+                _ = try YYJSONDocument(data: data)
+            }
+        }
+
+        @Test func initFromEmptyString() throws {
+            #expect(throws: YYJSONError.self) {
+                _ = try YYJSONDocument(string: "")
+            }
+        }
+
+        @Test func initFromInvalidJSON() throws {
+            let data = "not valid json".data(using: .utf8)!
+            #expect(throws: YYJSONError.self) {
+                _ = try YYJSONDocument(data: data)
+            }
+        }
+
+        @Test func parsingInPlace() throws {
+            let json = #"{"name": "test", "value": 42}"#
+            var data = json.data(using: .utf8)!
+            let document = try YYJSONDocument(parsingInPlace: &data)
+            #expect(document.root != nil)
+            #expect(document.root?["name"]?.string == "test")
+            #expect(document.root?["value"]?.number == 42.0)
+        }
+
+        @Test func parsingInPlaceEmptyData() throws {
+            var data = Data()
+            #expect(throws: YYJSONError.self) {
+                _ = try YYJSONDocument(parsingInPlace: &data)
+            }
+        }
+
+        @Test func parsingInPlaceInvalidJSON() throws {
+            var data = "not valid json".data(using: .utf8)!
+            #expect(throws: YYJSONError.self) {
+                _ = try YYJSONDocument(parsingInPlace: &data)
+            }
+        }
+    }
+
+    @Suite("YYJSONDocument - Root Access")
+    struct YYJSONDocumentRootTests {
+        @Test func rootProperty() throws {
+            let document = try YYJSONDocument(string: #"{"key": "value"}"#)
+            #expect(document.root != nil)
+            #expect(document.root?["key"]?.string == "value")
+        }
+
+        @Test func rootObjectProperty() throws {
+            let document = try YYJSONDocument(string: #"{"key": "value"}"#)
+            #expect(document.rootObject != nil)
+            #expect(document.rootObject?["key"]?.string == "value")
+        }
+
+        @Test func rootArrayProperty() throws {
+            let document = try YYJSONDocument(string: "[1, 2, 3]")
+            #expect(document.rootArray != nil)
+            #expect(document.rootArray?.count == 3)
+            #expect(document.rootArray?[0]?.number == 1.0)
+        }
+
+        @Test func rootObjectOnArray() throws {
+            let document = try YYJSONDocument(string: "[1, 2, 3]")
+            #expect(document.rootObject == nil)
+        }
+
+        @Test func rootArrayOnObject() throws {
+            let document = try YYJSONDocument(string: #"{"key": "value"}"#)
+            #expect(document.rootArray == nil)
+        }
+
+        @Test func rootOnPrimitive() throws {
+            let document = try YYJSONDocument(string: "42")
+            #expect(document.root != nil)
+            #expect(document.root?.number == 42.0)
+            #expect(document.rootObject == nil)
+            #expect(document.rootArray == nil)
+        }
+
+        @Test func rootOnString() throws {
+            let document = try YYJSONDocument(string: #""hello""#)
+            #expect(document.root != nil)
+            #expect(document.root?.string == "hello")
+        }
+
+        @Test func rootOnNull() throws {
+            let document = try YYJSONDocument(string: "null")
+            #expect(document.root != nil)
+            #expect(document.root?.isNull == true)
+        }
+
+        @Test func rootOnBool() throws {
+            let document = try YYJSONDocument(string: "true")
+            #expect(document.root != nil)
+            #expect(document.root?.bool == true)
+        }
+    }
+
+    @Suite("YYJSONDocument - Complex JSON")
+    struct YYJSONDocumentComplexTests {
+        @Test func nestedStructures() throws {
+            let json = """
+                {
+                    "users": [
+                        {"name": "Alice", "age": 30},
+                        {"name": "Bob", "age": 25}
+                    ],
+                    "meta": {"count": 2}
+                }
+                """
+            let document = try YYJSONDocument(string: json)
+            guard let root = document.root else {
+                Issue.record("Expected root")
+                return
+            }
+            guard let users = root["users"]?.array else {
+                Issue.record("Expected users array")
+                return
+            }
+            #expect(users.count == 2)
+            #expect(users[0]?["name"]?.string == "Alice")
+            #expect(users[1]?["name"]?.string == "Bob")
+            #expect(root["meta"]?["count"]?.number == 2.0)
+        }
+
+        @Test func largeDocument() throws {
+            var elements: [String] = []
+            for i in 0 ..< 100 {
+                elements.append(String(i))
+            }
+            let json = "[\(elements.joined(separator: ", "))]"
+            let document = try YYJSONDocument(string: json)
+            guard let array = document.rootArray else {
+                Issue.record("Expected array")
+                return
+            }
+            #expect(array.count == 100)
+            #expect(array[0]?.number == 0.0)
+            #expect(array[99]?.number == 99.0)
         }
     }
 

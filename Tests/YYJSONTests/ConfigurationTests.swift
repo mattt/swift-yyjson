@@ -14,11 +14,6 @@ import Testing
             #expect(options.rawValue == 0)
         }
 
-        @Test func inSituOption() {
-            let options = YYJSONReadOptions.inSitu
-            #expect(options.rawValue != 0)
-        }
-
         @Test func stopWhenDoneOption() throws {
             let json = #"{"key": "value"}  extra content"#
             let data = json.data(using: .utf8)!

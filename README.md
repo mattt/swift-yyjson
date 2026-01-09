@@ -129,6 +129,26 @@ if let name = value["users"]?[0]?["name"]?.string {
 }
 ```
 
+### In-Place Parsing
+
+For maximum performance with large JSON files,
+use in-place parsing to avoid copying the input data:
+
+```swift
+var data = try Data(contentsOf: fileURL)
+let json = try YYJSONValue.parseInPlace(consuming: &data)
+// `data` is now consumed and should not be used
+```
+
+In-place parsing allows yyjson to parse directly within the input buffer,
+avoiding memory allocation for string storage.
+The `inout` parameter makes it clear that the data is consumed by this operation.
+
+> [!NOTE]
+> For most use cases, the standard `YYJSONValue(data:)` initializer is sufficient.
+> Use in-place parsing only when performance is critical
+> and you can accept the ownership semantics.
+
 ### JSONSerialization Alternative
 
 Use `YYJSONSerialization` with the same API as Foundation's `JSONSerialization`:
@@ -157,7 +177,6 @@ let value = try YYJSONValue(data: data, options: [.allowComments, .allowTrailing
 
 Available options:
 
-- `.inSitu` — Parse in-place for speed (requires data to remain valid)
 - `.stopWhenDone` — Stop after first complete JSON document
 - `.numberAsRaw` — Read all numbers as raw strings
 - `.allowInvalidUnicode` — Allow reading invalid unicode

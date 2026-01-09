@@ -6,54 +6,82 @@ import Foundation
     // MARK: - Document (Internal)
 
     /// A safe wrapper around a yyjson document.
+    ///
     /// The document is immutable after creation and safe for concurrent reads.
     internal final class YYDocument: @unchecked Sendable {
         let doc: UnsafeMutablePointer<yyjson_doc>
 
-        /// Storage for in-situ parsing. Must remain alive for the lifetime of `doc`.
-        private var storage: Data?
+        /// Retained data buffer (used when parsing consumes the input).
+        private var retainedData: Data?
 
+        /// Creates a document by parsing JSON data.
+        ///
+        /// - Parameters:
+        ///   - data: The JSON data to parse.
+        ///   - options: Options for reading the JSON.
+        /// - Throws: `YYJSONError` if parsing fails.
         init(data: Data, options: YYJSONReadOptions = .default) throws {
             var error = yyjson_read_err()
-            let flags = options.yyjsonFlags
+            var flags = options.yyjsonFlags
+            // Mask out YYJSON_READ_INSITU to prevent use-after-free issues.
+            // In-place parsing must use the dedicated consuming initializer.
+            flags &= ~yyjson_read_flag(YYJSON_READ_INSITU)
 
-            if options.contains(.inSitu) {
-                // In-situ mode: we must keep the buffer alive and pass a mutable pointer.
-                // Create a copy with padding for yyjson's requirements.
-                let paddingSize = Int(YYJSON_PADDING_SIZE)
-                var mutableData = Data(data)
-                mutableData.append(contentsOf: repeatElement(0 as UInt8, count: paddingSize))
-                self.storage = mutableData
+            self.retainedData = nil
 
-                let dataCount = data.count
-                let result = self.storage!.withUnsafeMutableBytes { bytes -> UnsafeMutablePointer<yyjson_doc>? in
-                    let ptr = bytes.baseAddress?.assumingMemoryBound(to: CChar.self)
-                    return yyjson_read_opts(ptr, dataCount, flags, nil, &error)
-                }
-
-                guard let doc = result else {
-                    throw YYJSONError(parsing: error)
-                }
-                self.doc = doc
-            } else {
-                // Standard mode: yyjson copies all data internally, no need to retain.
-                self.storage = nil
-
-                if data.isEmpty {
-                    throw YYJSONError.invalidJSON("Empty content")
-                }
-
-                let result = data.withUnsafeBytes { bytes -> UnsafeMutablePointer<yyjson_doc>? in
-                    guard let baseAddress = bytes.baseAddress else { return nil }
-                    let ptr = UnsafeMutablePointer(mutating: baseAddress.assumingMemoryBound(to: CChar.self))
-                    return yyjson_read_opts(ptr, data.count, flags, nil, &error)
-                }
-
-                guard let doc = result else {
-                    throw YYJSONError(parsing: error)
-                }
-                self.doc = doc
+            if data.isEmpty {
+                throw YYJSONError.invalidJSON("Empty content")
             }
+
+            let result = data.withUnsafeBytes { bytes -> UnsafeMutablePointer<yyjson_doc>? in
+                guard let baseAddress = bytes.baseAddress else { return nil }
+                let ptr = UnsafeMutablePointer(mutating: baseAddress.assumingMemoryBound(to: CChar.self))
+                return yyjson_read_opts(ptr, data.count, flags, nil, &error)
+            }
+
+            guard let doc = result else {
+                throw YYJSONError(parsing: error)
+            }
+            self.doc = doc
+        }
+
+        /// Creates a document by consuming mutable data.
+        ///
+        /// This initializer takes ownership of the provided data
+        /// and parses directly within the buffer,
+        /// avoiding any data copies.
+        ///
+        /// - Parameters:
+        ///   - consuming: The data to parse.
+        ///     This data will be consumed and must not be used after this call.
+        ///   - options: Options for reading the JSON.
+        /// - Throws: `YYJSONError` if parsing fails.
+        init(consuming data: inout Data, options: YYJSONReadOptions = .default) throws {
+            var error = yyjson_read_err()
+            var flags = options.yyjsonFlags
+            flags |= YYJSON_READ_INSITU
+
+            if data.isEmpty {
+                throw YYJSONError.invalidJSON("Empty content")
+            }
+
+            let paddingSize = Int(YYJSON_PADDING_SIZE)
+            let originalCount = data.count
+
+            data.reserveCapacity(originalCount + paddingSize)
+            data.append(contentsOf: repeatElement(0 as UInt8, count: paddingSize))
+
+            self.retainedData = data
+
+            let result = self.retainedData!.withUnsafeMutableBytes { bytes -> UnsafeMutablePointer<yyjson_doc>? in
+                let ptr = bytes.baseAddress?.assumingMemoryBound(to: CChar.self)
+                return yyjson_read_opts(ptr, originalCount, flags, nil, &error)
+            }
+
+            guard let doc = result else {
+                throw YYJSONError(parsing: error)
+            }
+            self.doc = doc
         }
 
         deinit {
@@ -65,11 +93,110 @@ import Foundation
         }
     }
 
+    // MARK: - Document (Public)
+
+    /// A parsed JSON document that owns the underlying memory.
+    ///
+    /// `YYJSONDocument` is a move-only type
+    /// that represents ownership of a parsed JSON document.
+    /// It cannot be copied, only moved,
+    /// which makes resource ownership explicit at compile time.
+    ///
+    /// Use `YYJSONDocument` when you want explicit control
+    /// over the lifetime of the parsed JSON data.
+    /// For simpler use cases,
+    /// use ``YYJSONValue/init(data:options:)`` directly,
+    /// which manages the document internally.
+    ///
+    /// ## Example
+    ///
+    /// ```swift
+    /// let document = try YYJSONDocument(data: jsonData)
+    /// if let root = document.root {
+    ///     print(root["name"]?.string ?? "unknown")
+    /// }
+    /// ```
+    ///
+    /// For highest performance with large documents,
+    /// use in-place parsing:
+    ///
+    /// ```swift
+    /// var data = try Data(contentsOf: fileURL)
+    /// let document = try YYJSONDocument(parsingInPlace: &data)
+    /// // `data` is now consumed and should not be used
+    /// ```
+    public struct YYJSONDocument: ~Copyable, @unchecked Sendable {
+        internal let _document: YYDocument
+
+        /// Creates a document by parsing JSON data.
+        ///
+        /// - Parameters:
+        ///   - data: The JSON data to parse.
+        ///   - options: Options for reading the JSON.
+        /// - Throws: `YYJSONError` if parsing fails.
+        public init(data: Data, options: YYJSONReadOptions = .default) throws {
+            self._document = try YYDocument(data: data, options: options)
+        }
+
+        /// Creates a document by parsing a JSON string.
+        ///
+        /// - Parameters:
+        ///   - string: The JSON string to parse.
+        ///   - options: Options for reading the JSON.
+        /// - Throws: `YYJSONError` if parsing fails.
+        public init(string: String, options: YYJSONReadOptions = .default) throws {
+            guard let data = string.data(using: .utf8) else {
+                throw YYJSONError.invalidJSON("Invalid UTF-8 string")
+            }
+            self._document = try YYDocument(data: data, options: options)
+        }
+
+        /// Creates a document by parsing JSON data in place,
+        /// consuming the provided data.
+        ///
+        /// This initializer provides the highest performance parsing
+        /// by avoiding a copy of the input data.
+        /// The `data` parameter is consumed during parsing
+        /// and retained by the document for its lifetime.
+        ///
+        /// - Parameters:
+        ///   - parsingInPlace: The JSON data to parse.
+        ///     This data will be **consumed** by this initializer
+        ///     and is no longer valid after the call.
+        ///   - options: Options for reading the JSON.
+        /// - Throws: `YYJSONError` if parsing fails.
+        public init(parsingInPlace data: inout Data, options: YYJSONReadOptions = .default) throws {
+            self._document = try YYDocument(consuming: &data, options: options)
+        }
+
+        /// The root value of the parsed JSON document.
+        ///
+        /// Returns `nil` if the document has no root value.
+        public var root: YYJSONValue? {
+            guard let root = _document.root else {
+                return nil
+            }
+            return YYJSONValue(value: root, document: _document)
+        }
+
+        /// The root value as an object, or `nil` if the root is not an object
+        /// or if the document has no root value.
+        public var rootObject: YYJSONObject? {
+            root?.object
+        }
+
+        /// The root value as an array, or `nil` if the root is not an array
+        /// or if the document has no root value.
+        public var rootArray: YYJSONArray? {
+            root?.array
+        }
+    }
+
     // MARK: - Value
 
     /// A JSON value that can represent any JSON type.
     ///
-    /// `YYJSONValue` is safe for concurrent reads across multiple threads/tasks
+    /// `YYJSONValue` is safe for concurrent reads across multiple threads and tasks
     /// because the underlying yyjson document is immutable after parsing.
     ///
     /// String values are lazily converted to Swift `String`
@@ -93,9 +220,11 @@ import Foundation
         /// The document that owns this value (for lifetime management).
         internal let document: YYDocument
 
-        /// Initialize from a yyjson value pointer.
-        /// - Parameter value: The yyjson value pointer, or nil for null.
-        /// - Parameter document: The document that owns this value (for lifetime management).
+        /// Initializes from a yyjson value pointer.
+        ///
+        /// - Parameters:
+        ///   - value: The yyjson value pointer, or `nil` for null.
+        ///   - document: The document that owns this value (for lifetime management).
         init(value: UnsafeMutablePointer<yyjson_val>?, document: YYDocument) {
             self.document = document
 
@@ -138,18 +267,22 @@ import Foundation
             return false
         }
 
-        /// Access a value in an object by key.
+        /// Accesses a value in an object by key.
+        ///
         /// - Parameter key: The key to look up.
-        /// - Returns: The value at the key, or nil if not found or not an object.
+        /// - Returns: The value at the key,
+        ///   or `nil` if not found or not an object.
         public subscript(key: String) -> YYJSONValue? {
             guard case .object(let ptr) = kind else { return nil }
             guard let val = yyjson_obj_get(ptr, key) else { return nil }
             return YYJSONValue(value: val, document: document)
         }
 
-        /// Access a value in an array by index.
+        /// Accesses a value in an array by index.
+        ///
         /// - Parameter index: The index to access.
-        /// - Returns: The value at the index, or nil if out of bounds or not an array.
+        /// - Returns: The value at the index,
+        ///   or `nil` if out of bounds or not an array.
         public subscript(index: Int) -> YYJSONValue? {
             guard case .array(let ptr) = kind else { return nil }
             guard let val = yyjson_arr_get(ptr, index) else { return nil }
@@ -180,25 +313,25 @@ import Foundation
             return nil
         }
 
-        /// Get the number value, or nil if not a number.
+        /// The number value, or `nil` if not a number.
         public var number: Double? {
             if case .number(let num) = kind { return num }
             return nil
         }
 
-        /// Get the bool value, or nil if not a bool.
+        /// The Boolean value, or `nil` if not a Boolean.
         public var bool: Bool? {
             if case .bool(let b) = kind { return b }
             return nil
         }
 
-        /// Get the object value, or nil if not an object.
+        /// The object value, or `nil` if not an object.
         public var object: YYJSONObject? {
             guard case .object(let ptr) = kind else { return nil }
             return YYJSONObject(value: ptr, document: document)
         }
 
-        /// Get the array value, or nil if not an array.
+        /// The array value, or `nil` if not an array.
         public var array: YYJSONArray? {
             guard case .array(let ptr) = kind else { return nil }
             return YYJSONArray(value: ptr, document: document)
@@ -228,7 +361,7 @@ import Foundation
 
     /// A JSON object providing key-value access.
     ///
-    /// `YYJSONObject` is safe for concurrent reads across multiple threads/tasks
+    /// `YYJSONObject` is safe for concurrent reads across multiple threads and tasks
     /// because the underlying yyjson document is immutable after parsing.
     public struct YYJSONObject: @unchecked Sendable {
         internal let value: UnsafeMutablePointer<yyjson_val>
@@ -239,9 +372,10 @@ import Foundation
             self.document = document
         }
 
-        /// Access a value by key.
+        /// Accesses a value by key.
+        ///
         /// - Parameter key: The key to look up.
-        /// - Returns: The value at the key, or nil if not found.
+        /// - Returns: The value at the key, or `nil` if not found.
         public subscript(key: String) -> YYJSONValue? {
             guard let val = yyjson_obj_get(value, key) else {
                 return nil
@@ -249,14 +383,15 @@ import Foundation
             return YYJSONValue(value: val, document: document)
         }
 
-        /// Check if the object contains a key.
+        /// Returns a Boolean value indicating whether the object contains the given key.
+        ///
         /// - Parameter key: The key to check.
-        /// - Returns: True if the key exists.
+        /// - Returns: `true` if the key exists; otherwise, `false`.
         public func contains(_ key: String) -> Bool {
             yyjson_obj_get(value, key) != nil
         }
 
-        /// Get all keys in the object.
+        /// All keys in the object.
         public var keys: [String] {
             var keys: [String] = []
             var iter = yyjson_obj_iter_with(value)
@@ -316,7 +451,7 @@ import Foundation
 
     /// A JSON array providing indexed access.
     ///
-    /// `YYJSONArray` is safe for concurrent reads across multiple threads/tasks
+    /// `YYJSONArray` is safe for concurrent reads across multiple threads and tasks
     /// because the underlying yyjson document is immutable after parsing.
     public struct YYJSONArray: @unchecked Sendable {
         internal let value: UnsafeMutablePointer<yyjson_val>
@@ -327,9 +462,10 @@ import Foundation
             self.document = document
         }
 
-        /// Access a value by index.
+        /// Accesses a value by index.
+        ///
         /// - Parameter index: The index to access.
-        /// - Returns: The value at the index, or nil if out of bounds.
+        /// - Returns: The value at the index, or `nil` if out of bounds.
         public subscript(index: Int) -> YYJSONValue? {
             guard let val = yyjson_arr_get(value, index) else {
                 return nil
@@ -379,7 +515,8 @@ import Foundation
     // MARK: - Parsing
 
     extension YYJSONValue {
-        /// Create a JSON value by parsing JSON data.
+        /// Creates a JSON value by parsing JSON data.
+        ///
         /// - Parameters:
         ///   - data: The JSON data to parse.
         ///   - options: Options for reading the JSON.
@@ -392,7 +529,8 @@ import Foundation
             self.init(value: root, document: document)
         }
 
-        /// Create a JSON value by parsing a JSON string.
+        /// Creates a JSON value by parsing a JSON string.
+        ///
         /// - Parameters:
         ///   - string: The JSON string to parse.
         ///   - options: Options for reading the JSON.
@@ -402,6 +540,48 @@ import Foundation
                 throw YYJSONError.invalidJSON("Invalid UTF-8 string")
             }
             try self.init(data: data, options: options)
+        }
+
+        /// Parses JSON data in place, consuming the provided data.
+        ///
+        /// This method provides the highest performance parsing by:
+        /// 1. Avoiding a copy of the input data
+        ///    (yyjson parses directly in the buffer)
+        /// 2. Lazily converting strings to Swift `String` only when accessed
+        ///
+        /// The `data` parameter is consumed during parsing
+        /// and retained by the returned `YYJSONValue` for its lifetime.
+        /// After calling this method,
+        /// the original binding is no longer valid.
+        ///
+        /// - Parameters:
+        ///   - data: The JSON data to parse.
+        ///     This data will be **consumed** by this method
+        ///     and is no longer valid after the call.
+        ///   - options: Options for reading the JSON.
+        /// - Returns: The parsed JSON value.
+        /// - Throws: `YYJSONError` if parsing fails.
+        ///
+        /// ## Example
+        ///
+        /// ```swift
+        /// var data = try Data(contentsOf: fileURL)
+        /// let json = try YYJSONValue.parseInPlace(consuming: &data)
+        /// // `data` is now consumed — compiler prevents further use
+        /// ```
+        ///
+        /// - Note: For most use cases,
+        ///   the standard ``init(data:options:)`` initializer is sufficient.
+        ///   Use this method when parsing performance is critical
+        ///   and you can accept the ownership semantics.
+        public static func parseInPlace(consuming data: inout Data, options: YYJSONReadOptions = .default) throws
+            -> YYJSONValue
+        {
+            let document = try YYDocument(consuming: &data, options: options)
+            guard let root = document.root else {
+                throw YYJSONError.invalidData("Document has no root value")
+            }
+            return YYJSONValue(value: root, document: document)
         }
     }
 

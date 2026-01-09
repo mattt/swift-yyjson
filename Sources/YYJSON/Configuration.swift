@@ -12,16 +12,7 @@ public struct YYJSONReadOptions: OptionSet, Sendable {
     /// Default option (RFC 8259 compliant).
     public static let `default` = YYJSONReadOptions([])
 
-    /// Read the input data in-situ.
-    ///
-    /// This option allows the reader to modify and use input data to store string
-    /// values, which can increase reading speed slightly.
-    ///
-    /// - Warning: The input data must remain valid for the lifetime of the document.
-    ///   The input data must be padded by at least 4 bytes.
-    public static let inSitu = YYJSONReadOptions(rawValue: YYJSON_READ_INSITU)
-
-    /// Stop when done instead of issuing an error if there's additional content
+    /// Stops when done instead of issuing an error if there's additional content
     /// after a JSON document.
     public static let stopWhenDone = YYJSONReadOptions(rawValue: YYJSON_READ_STOP_WHEN_DONE)
 
