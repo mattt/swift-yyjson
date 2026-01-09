@@ -695,14 +695,14 @@ import Testing
         }
     }
 
-    // MARK: - In-Situ Parsing Tests
+    // MARK: - In-Place Parsing Tests
 
-    @Suite("YYJSONValue - In-Situ Parsing")
-    struct ValueInSituTests {
-        @Test func parseWithInSitu() throws {
+    @Suite("YYJSONValue - In-Place Parsing")
+    struct ValueInPlaceTests {
+        @Test func parseInPlace() throws {
             let json = #"{"name": "test", "value": 42}"#
-            let data = json.data(using: .utf8)!
-            let value = try YYJSONValue(data: data, options: .inSitu)
+            var data = json.data(using: .utf8)!
+            let value = try YYJSONValue.parseInPlace(consuming: &data)
             #expect(value["name"]?.string == "test")
             #expect(value["value"]?.number == 42.0)
         }
