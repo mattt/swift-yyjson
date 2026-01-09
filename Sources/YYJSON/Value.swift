@@ -71,13 +71,19 @@ import Foundation
     ///
     /// `YYJSONValue` is safe for concurrent reads across multiple threads/tasks
     /// because the underlying yyjson document is immutable after parsing.
+    ///
+    /// String values are lazily converted to Swift `String`
+    /// when accessed via the `.string` property.
+    /// For zero-allocation access in performance-critical code,
+    /// use `.cString` to get the raw C string pointer.
     public struct YYJSONValue: @unchecked Sendable {
         /// Internal storage for the value kind.
+        /// Strings are stored as pointers and converted lazily on access.
         private enum Kind {
             case null
             case bool(Bool)
             case number(Double)
-            case string(String)
+            case stringPtr(UnsafePointer<CChar>)
             case object(UnsafeMutablePointer<yyjson_val>)
             case array(UnsafeMutablePointer<yyjson_val>)
         }
@@ -113,7 +119,7 @@ import Foundation
                 self.kind = .number(num)
             case YYJSON_TYPE_STR:
                 if let str = yyjson_get_str(val) {
-                    self.kind = .string(String(cString: str))
+                    self.kind = .stringPtr(str)
                 } else {
                     self.kind = .null
                 }
@@ -151,8 +157,26 @@ import Foundation
         }
 
         /// Get the string value, or nil if not a string.
+        ///
+        /// This property converts the underlying C string to a Swift `String`,
+        /// which involves a copy.
+        /// For zero-allocation access in hot paths, use `.cString` instead.
         public var string: String? {
-            if case .string(let str) = kind { return str }
+            if case .stringPtr(let ptr) = kind {
+                return String(cString: ptr)
+            }
+            return nil
+        }
+
+        /// Get the raw C string pointer, or nil if not a string.
+        ///
+        /// This provides zero-allocation access to the string data. The pointer
+        /// is valid for the lifetime of the `YYJSONValue` and its underlying document.
+        ///
+        /// - Warning: Do not use this pointer after the `YYJSONValue`
+        ///            or its originating document has been deallocated.
+        public var cString: UnsafePointer<CChar>? {
+            if case .stringPtr(let ptr) = kind { return ptr }
             return nil
         }
 
@@ -190,8 +214,8 @@ import Foundation
                 return b ? "true" : "false"
             case .number(let n):
                 return String(n)
-            case .string(let s):
-                return "\"\(s)\""
+            case .stringPtr(let ptr):
+                return "\"\(String(cString: ptr))\""
             case .object(let ptr):
                 return YYJSONObject(value: ptr, document: document).description
             case .array(let ptr):
