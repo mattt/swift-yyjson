@@ -220,17 +220,54 @@ import Foundation
         case convertFromString(positiveInfinity: String, negativeInfinity: String, nan: String)
     }
 
+    // MARK: - Shared Decoder Configuration
+
+    /// Shared configuration for decoder instances.
+    ///
+    /// This class is used to avoid copying strategy values and userInfo
+    /// for every nested decoder and container, which reduces allocations
+    /// significantly for deeply nested JSON structures.
+    final class _YYDecoderConfig: @unchecked Sendable {
+        let userInfo: [CodingUserInfoKey: Any]
+        let keyDecodingStrategy: KeyDecodingStrategy
+        let dateDecodingStrategy: DateDecodingStrategy
+        let dataDecodingStrategy: DataDecodingStrategy
+        let nonConformingFloatDecodingStrategy: NonConformingFloatDecodingStrategy
+
+        init(
+            userInfo: [CodingUserInfoKey: Any],
+            keyDecodingStrategy: KeyDecodingStrategy,
+            dateDecodingStrategy: DateDecodingStrategy,
+            dataDecodingStrategy: DataDecodingStrategy,
+            nonConformingFloatDecodingStrategy: NonConformingFloatDecodingStrategy
+        ) {
+            self.userInfo = userInfo
+            self.keyDecodingStrategy = keyDecodingStrategy
+            self.dateDecodingStrategy = dateDecodingStrategy
+            self.dataDecodingStrategy = dataDecodingStrategy
+            self.nonConformingFloatDecodingStrategy = nonConformingFloatDecodingStrategy
+        }
+    }
+
     // MARK: - Internal Decoder Implementation
 
     /// Internal decoder implementing the Decoder protocol.
     struct _YYDecoder: Decoder {
         let value: UnsafeMutablePointer<yyjson_val>?
         let codingPath: [CodingKey]
-        let userInfo: [CodingUserInfoKey: Any]
-        let keyDecodingStrategy: KeyDecodingStrategy
-        let dateDecodingStrategy: DateDecodingStrategy
-        let dataDecodingStrategy: DataDecodingStrategy
-        let nonConformingFloatDecodingStrategy: NonConformingFloatDecodingStrategy
+        let config: _YYDecoderConfig
+
+        var userInfo: [CodingUserInfoKey: Any] { config.userInfo }
+
+        init(
+            value: UnsafeMutablePointer<yyjson_val>?,
+            codingPath: [CodingKey] = [],
+            config: _YYDecoderConfig
+        ) {
+            self.value = value
+            self.codingPath = codingPath
+            self.config = config
+        }
 
         init(
             value: UnsafeMutablePointer<yyjson_val>?,
@@ -243,11 +280,13 @@ import Foundation
         ) {
             self.value = value
             self.codingPath = codingPath
-            self.userInfo = userInfo
-            self.keyDecodingStrategy = keyDecodingStrategy
-            self.dateDecodingStrategy = dateDecodingStrategy
-            self.dataDecodingStrategy = dataDecodingStrategy
-            self.nonConformingFloatDecodingStrategy = nonConformingFloatDecodingStrategy
+            self.config = _YYDecoderConfig(
+                userInfo: userInfo,
+                keyDecodingStrategy: keyDecodingStrategy,
+                dateDecodingStrategy: dateDecodingStrategy,
+                dataDecodingStrategy: dataDecodingStrategy,
+                nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+            )
         }
 
         func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key>
@@ -267,11 +306,7 @@ import Foundation
             let container = _YYKeyedDecodingContainer<Key>(
                 value: value,
                 codingPath: codingPath,
-                userInfo: userInfo,
-                keyDecodingStrategy: keyDecodingStrategy,
-                dateDecodingStrategy: dateDecodingStrategy,
-                dataDecodingStrategy: dataDecodingStrategy,
-                nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                config: config
             )
             return KeyedDecodingContainer(container)
         }
@@ -292,10 +327,7 @@ import Foundation
             return _YYUnkeyedDecodingContainer(
                 value: value,
                 codingPath: codingPath,
-                userInfo: userInfo,
-                dateDecodingStrategy: dateDecodingStrategy,
-                dataDecodingStrategy: dataDecodingStrategy,
-                nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                config: config
             )
         }
 
@@ -303,10 +335,7 @@ import Foundation
             _YYSingleValueDecodingContainer(
                 value: value,
                 codingPath: codingPath,
-                userInfo: userInfo,
-                dateDecodingStrategy: dateDecodingStrategy,
-                dataDecodingStrategy: dataDecodingStrategy,
-                nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                config: config
             )
         }
 
@@ -340,11 +369,14 @@ import Foundation
     struct _YYKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol {
         let value: UnsafeMutablePointer<yyjson_val>
         let codingPath: [CodingKey]
-        let userInfo: [CodingUserInfoKey: Any]
-        let keyDecodingStrategy: KeyDecodingStrategy
-        let dateDecodingStrategy: DateDecodingStrategy
-        let dataDecodingStrategy: DataDecodingStrategy
-        let nonConformingFloatDecodingStrategy: NonConformingFloatDecodingStrategy
+        let config: _YYDecoderConfig
+
+        private var keyDecodingStrategy: KeyDecodingStrategy { config.keyDecodingStrategy }
+        private var dateDecodingStrategy: DateDecodingStrategy { config.dateDecodingStrategy }
+        private var dataDecodingStrategy: DataDecodingStrategy { config.dataDecodingStrategy }
+        private var nonConformingFloatDecodingStrategy: NonConformingFloatDecodingStrategy {
+            config.nonConformingFloatDecodingStrategy
+        }
 
         var allKeys: [Key] {
             var keys: [Key] = []
@@ -659,11 +691,7 @@ import Foundation
             let decoder = _YYDecoder(
                 value: val,
                 codingPath: codingPath + [key],
-                userInfo: userInfo,
-                keyDecodingStrategy: keyDecodingStrategy,
-                dateDecodingStrategy: dateDecodingStrategy,
-                dataDecodingStrategy: dataDecodingStrategy,
-                nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                config: config
             )
             return try T(from: decoder)
         }
@@ -681,11 +709,7 @@ import Foundation
                 let decoder = _YYDecoder(
                     value: value,
                     codingPath: codingPath,
-                    userInfo: userInfo,
-                    keyDecodingStrategy: keyDecodingStrategy,
-                    dateDecodingStrategy: dateDecodingStrategy,
-                    dataDecodingStrategy: dataDecodingStrategy,
-                    nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                    config: config
                 )
                 return try Date(from: decoder)
 
@@ -742,11 +766,7 @@ import Foundation
                 let decoder = _YYDecoder(
                     value: value,
                     codingPath: codingPath,
-                    userInfo: userInfo,
-                    keyDecodingStrategy: keyDecodingStrategy,
-                    dateDecodingStrategy: dateDecodingStrategy,
-                    dataDecodingStrategy: dataDecodingStrategy,
-                    nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                    config: config
                 )
                 return try closure(decoder)
             }
@@ -781,11 +801,7 @@ import Foundation
                 let decoder = _YYDecoder(
                     value: value,
                     codingPath: codingPath,
-                    userInfo: userInfo,
-                    keyDecodingStrategy: keyDecodingStrategy,
-                    dateDecodingStrategy: dateDecodingStrategy,
-                    dataDecodingStrategy: dataDecodingStrategy,
-                    nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                    config: config
                 )
                 return try Data(from: decoder)
 
@@ -793,11 +809,7 @@ import Foundation
                 let decoder = _YYDecoder(
                     value: value,
                     codingPath: codingPath,
-                    userInfo: userInfo,
-                    keyDecodingStrategy: keyDecodingStrategy,
-                    dateDecodingStrategy: dateDecodingStrategy,
-                    dataDecodingStrategy: dataDecodingStrategy,
-                    nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                    config: config
                 )
                 return try closure(decoder)
             }
@@ -853,11 +865,7 @@ import Foundation
             let decoder = _YYDecoder(
                 value: val,
                 codingPath: codingPath + [key],
-                userInfo: userInfo,
-                keyDecodingStrategy: keyDecodingStrategy,
-                dateDecodingStrategy: dateDecodingStrategy,
-                dataDecodingStrategy: dataDecodingStrategy,
-                nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                config: config
             )
             return try decoder.container(keyedBy: type)
         }
@@ -868,11 +876,7 @@ import Foundation
             let decoder = _YYDecoder(
                 value: val,
                 codingPath: codingPath + [key],
-                userInfo: userInfo,
-                keyDecodingStrategy: keyDecodingStrategy,
-                dateDecodingStrategy: dateDecodingStrategy,
-                dataDecodingStrategy: dataDecodingStrategy,
-                nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                config: config
             )
             return try decoder.unkeyedContainer()
         }
@@ -881,11 +885,7 @@ import Foundation
             _YYDecoder(
                 value: value,
                 codingPath: codingPath,
-                userInfo: userInfo,
-                keyDecodingStrategy: keyDecodingStrategy,
-                dateDecodingStrategy: dateDecodingStrategy,
-                dataDecodingStrategy: dataDecodingStrategy,
-                nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                config: config
             )
         }
 
@@ -895,11 +895,7 @@ import Foundation
             return _YYDecoder(
                 value: val,
                 codingPath: codingPath + [key],
-                userInfo: userInfo,
-                keyDecodingStrategy: keyDecodingStrategy,
-                dateDecodingStrategy: dateDecodingStrategy,
-                dataDecodingStrategy: dataDecodingStrategy,
-                nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                config: config
             )
         }
 
@@ -942,10 +938,13 @@ import Foundation
     struct _YYUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         let value: UnsafeMutablePointer<yyjson_val>
         let codingPath: [CodingKey]
-        let userInfo: [CodingUserInfoKey: Any]
-        let dateDecodingStrategy: DateDecodingStrategy
-        let dataDecodingStrategy: DataDecodingStrategy
-        let nonConformingFloatDecodingStrategy: NonConformingFloatDecodingStrategy
+        let config: _YYDecoderConfig
+
+        private var dateDecodingStrategy: DateDecodingStrategy { config.dateDecodingStrategy }
+        private var dataDecodingStrategy: DataDecodingStrategy { config.dataDecodingStrategy }
+        private var nonConformingFloatDecodingStrategy: NonConformingFloatDecodingStrategy {
+            config.nonConformingFloatDecodingStrategy
+        }
 
         var currentIndex: Int = 0
         private var iterator: yyjson_arr_iter
@@ -953,17 +952,11 @@ import Foundation
         init(
             value: UnsafeMutablePointer<yyjson_val>,
             codingPath: [CodingKey],
-            userInfo: [CodingUserInfoKey: Any],
-            dateDecodingStrategy: DateDecodingStrategy = .deferredToDate,
-            dataDecodingStrategy: DataDecodingStrategy = .base64,
-            nonConformingFloatDecodingStrategy: NonConformingFloatDecodingStrategy = .throw
+            config: _YYDecoderConfig
         ) {
             self.value = value
             self.codingPath = codingPath
-            self.userInfo = userInfo
-            self.dateDecodingStrategy = dateDecodingStrategy
-            self.dataDecodingStrategy = dataDecodingStrategy
-            self.nonConformingFloatDecodingStrategy = nonConformingFloatDecodingStrategy
+            self.config = config
             self.iterator = yyjson_arr_iter_with(value)
         }
 
@@ -1189,11 +1182,7 @@ import Foundation
             let decoder = _YYDecoder(
                 value: val,
                 codingPath: currentCodingPath,
-                userInfo: userInfo,
-                keyDecodingStrategy: .useDefaultKeys,
-                dateDecodingStrategy: dateDecodingStrategy,
-                dataDecodingStrategy: dataDecodingStrategy,
-                nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                config: config
             )
             return try T(from: decoder)
         }
@@ -1206,11 +1195,7 @@ import Foundation
                 let decoder = _YYDecoder(
                     value: value,
                     codingPath: currentCodingPath,
-                    userInfo: userInfo,
-                    keyDecodingStrategy: .useDefaultKeys,
-                    dateDecodingStrategy: dateDecodingStrategy,
-                    dataDecodingStrategy: dataDecodingStrategy,
-                    nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                    config: config
                 )
                 return try Date(from: decoder)
 
@@ -1266,11 +1251,7 @@ import Foundation
                 let decoder = _YYDecoder(
                     value: value,
                     codingPath: currentCodingPath,
-                    userInfo: userInfo,
-                    keyDecodingStrategy: .useDefaultKeys,
-                    dateDecodingStrategy: dateDecodingStrategy,
-                    dataDecodingStrategy: dataDecodingStrategy,
-                    nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                    config: config
                 )
                 return try closure(decoder)
             }
@@ -1301,11 +1282,7 @@ import Foundation
                 let decoder = _YYDecoder(
                     value: value,
                     codingPath: currentCodingPath,
-                    userInfo: userInfo,
-                    keyDecodingStrategy: .useDefaultKeys,
-                    dateDecodingStrategy: dateDecodingStrategy,
-                    dataDecodingStrategy: dataDecodingStrategy,
-                    nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                    config: config
                 )
                 return try Data(from: decoder)
 
@@ -1313,11 +1290,7 @@ import Foundation
                 let decoder = _YYDecoder(
                     value: value,
                     codingPath: currentCodingPath,
-                    userInfo: userInfo,
-                    keyDecodingStrategy: .useDefaultKeys,
-                    dateDecodingStrategy: dateDecodingStrategy,
-                    dataDecodingStrategy: dataDecodingStrategy,
-                    nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                    config: config
                 )
                 return try closure(decoder)
             }
@@ -1333,11 +1306,7 @@ import Foundation
             let decoder = _YYDecoder(
                 value: val,
                 codingPath: currentCodingPath,
-                userInfo: userInfo,
-                keyDecodingStrategy: .useDefaultKeys,
-                dateDecodingStrategy: dateDecodingStrategy,
-                dataDecodingStrategy: dataDecodingStrategy,
-                nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                config: config
             )
             return try decoder.container(keyedBy: type)
         }
@@ -1350,11 +1319,7 @@ import Foundation
             let decoder = _YYDecoder(
                 value: val,
                 codingPath: currentCodingPath,
-                userInfo: userInfo,
-                keyDecodingStrategy: .useDefaultKeys,
-                dateDecodingStrategy: dateDecodingStrategy,
-                dataDecodingStrategy: dataDecodingStrategy,
-                nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                config: config
             )
             return try decoder.unkeyedContainer()
         }
@@ -1367,11 +1332,7 @@ import Foundation
             return _YYDecoder(
                 value: val,
                 codingPath: currentCodingPath,
-                userInfo: userInfo,
-                keyDecodingStrategy: .useDefaultKeys,
-                dateDecodingStrategy: dateDecodingStrategy,
-                dataDecodingStrategy: dataDecodingStrategy,
-                nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                config: config
             )
         }
 
@@ -1403,25 +1364,23 @@ import Foundation
     struct _YYSingleValueDecodingContainer: SingleValueDecodingContainer {
         let value: UnsafeMutablePointer<yyjson_val>?
         let codingPath: [CodingKey]
-        let userInfo: [CodingUserInfoKey: Any]
-        let dateDecodingStrategy: DateDecodingStrategy
-        let dataDecodingStrategy: DataDecodingStrategy
-        let nonConformingFloatDecodingStrategy: NonConformingFloatDecodingStrategy
+        let config: _YYDecoderConfig
+
+        private var userInfo: [CodingUserInfoKey: Any] { config.userInfo }
+        private var dateDecodingStrategy: DateDecodingStrategy { config.dateDecodingStrategy }
+        private var dataDecodingStrategy: DataDecodingStrategy { config.dataDecodingStrategy }
+        private var nonConformingFloatDecodingStrategy: NonConformingFloatDecodingStrategy {
+            config.nonConformingFloatDecodingStrategy
+        }
 
         init(
             value: UnsafeMutablePointer<yyjson_val>?,
             codingPath: [CodingKey],
-            userInfo: [CodingUserInfoKey: Any],
-            dateDecodingStrategy: DateDecodingStrategy = .deferredToDate,
-            dataDecodingStrategy: DataDecodingStrategy = .base64,
-            nonConformingFloatDecodingStrategy: NonConformingFloatDecodingStrategy = .throw
+            config: _YYDecoderConfig
         ) {
             self.value = value
             self.codingPath = codingPath
-            self.userInfo = userInfo
-            self.dateDecodingStrategy = dateDecodingStrategy
-            self.dataDecodingStrategy = dataDecodingStrategy
-            self.nonConformingFloatDecodingStrategy = nonConformingFloatDecodingStrategy
+            self.config = config
         }
 
         func decodeNil() -> Bool {
@@ -1617,11 +1576,7 @@ import Foundation
             let decoder = _YYDecoder(
                 value: val,
                 codingPath: codingPath,
-                userInfo: userInfo,
-                keyDecodingStrategy: .useDefaultKeys,
-                dateDecodingStrategy: dateDecodingStrategy,
-                dataDecodingStrategy: dataDecodingStrategy,
-                nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                config: config
             )
             return try T(from: decoder)
         }
@@ -1634,11 +1589,7 @@ import Foundation
                 let decoder = _YYDecoder(
                     value: value,
                     codingPath: codingPath,
-                    userInfo: userInfo,
-                    keyDecodingStrategy: .useDefaultKeys,
-                    dateDecodingStrategy: dateDecodingStrategy,
-                    dataDecodingStrategy: dataDecodingStrategy,
-                    nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                    config: config
                 )
                 return try Date(from: decoder)
 
@@ -1694,11 +1645,7 @@ import Foundation
                 let decoder = _YYDecoder(
                     value: value,
                     codingPath: codingPath,
-                    userInfo: userInfo,
-                    keyDecodingStrategy: .useDefaultKeys,
-                    dateDecodingStrategy: dateDecodingStrategy,
-                    dataDecodingStrategy: dataDecodingStrategy,
-                    nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                    config: config
                 )
                 return try closure(decoder)
             }
@@ -1729,11 +1676,7 @@ import Foundation
                 let decoder = _YYDecoder(
                     value: value,
                     codingPath: codingPath,
-                    userInfo: userInfo,
-                    keyDecodingStrategy: .useDefaultKeys,
-                    dateDecodingStrategy: dateDecodingStrategy,
-                    dataDecodingStrategy: dataDecodingStrategy,
-                    nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                    config: config
                 )
                 return try Data(from: decoder)
 
@@ -1741,11 +1684,7 @@ import Foundation
                 let decoder = _YYDecoder(
                     value: value,
                     codingPath: codingPath,
-                    userInfo: userInfo,
-                    keyDecodingStrategy: .useDefaultKeys,
-                    dateDecodingStrategy: dateDecodingStrategy,
-                    dataDecodingStrategy: dataDecodingStrategy,
-                    nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy
+                    config: config
                 )
                 return try closure(decoder)
             }
