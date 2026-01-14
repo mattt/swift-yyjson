@@ -49,6 +49,51 @@ import Foundation
             self.userInfo = [:]
         }
 
+        /// Pre-initializes the decoder's internal machinery for a specific type.
+        ///
+        /// Call this method once at app or service startup to avoid cold-start latency
+        /// when decoding complex or deeply nested types. The first decode of any `Decodable` type
+        /// with `YYJSONDecoder` triggers Swift runtime metadata and witness table initialization,
+        /// which can be expensive for complex type graphs.
+        ///
+        /// By warming up with your actual payload type, subsequent decodes will be fast.
+        ///
+        /// - Parameter type: The type to warm up for. Pass the same type you'll decode in production.
+        ///
+        /// ## Example
+        ///
+        /// ```swift
+        /// // At app startup, before any latency-sensitive operations
+        /// YYJSONDecoder.warmup(for: MyComplexPayload.self)
+        ///
+        /// // Later decodes will be fast
+        /// let decoder = YYJSONDecoder()
+        /// let payload = try decoder.decode(MyComplexPayload.self, from: data)
+        /// ```
+        @discardableResult
+        public static func warmup<T: Decodable>(for type: T.Type) -> Bool {
+            // Try to decode from minimal JSON structures to trigger metadata init
+            // We try multiple shapes since we don't know what T expects
+            let jsonVariants: [Data] = [
+                Data("null".utf8),
+                Data("{}".utf8),
+                Data("[]".utf8),
+                Data("\"\"".utf8),
+                Data("0".utf8),
+                Data("true".utf8),
+            ]
+
+            let decoder = YYJSONDecoder()
+            for json in jsonVariants {
+                if let _ = try? decoder.decode(type, from: json) {
+                    return true
+                }
+            }
+
+            // Even if decoding fails, the attempt still triggers metadata initialization
+            return false
+        }
+
         /// Decodes a value of the given type from JSON data.
         /// - Parameters:
         ///   - type: The type to decode.
