@@ -3,6 +3,21 @@ import Foundation
 
 #if !YYJSON_DISABLE_WRITER
 
+    // MARK: - Helper Functions
+
+    @inline(__always)
+    func yyFromString(_ string: String, in doc: UnsafeMutablePointer<yyjson_mut_doc>) -> UnsafeMutablePointer<
+        yyjson_mut_val
+    > {
+        var tmp = string
+        return tmp.withUTF8 { buf in
+            if let ptr = buf.baseAddress {
+                return yyjson_mut_strncpy(doc, ptr, buf.count)
+            }
+            return yyjson_mut_strn(doc, "", 0)
+        }
+    }
+
     /// An encoder that encodes Swift types into JSON data using the yyjson library.
     public struct YYJSONEncoder {
         /// Options for writing JSON.
@@ -209,28 +224,28 @@ import Foundation
         mutating func encodeNil(forKey key: Key) throws {
             guard let obj = value else { return }
             let nullVal = yyjson_mut_null(doc)
-            let keyVal = yyjson_mut_strcpy(doc, key.stringValue)
+            let keyVal = yyFromString(key.stringValue, in: doc)
             _ = yyjson_mut_obj_put(obj, keyVal, nullVal)
         }
 
         mutating func encode(_ value: Bool, forKey key: Key) throws {
             guard let obj = self.value else { return }
             let boolVal = yyjson_mut_bool(doc, value)
-            let keyVal = yyjson_mut_strcpy(doc, key.stringValue)
+            let keyVal = yyFromString(key.stringValue, in: doc)
             _ = yyjson_mut_obj_put(obj, keyVal, boolVal)
         }
 
         mutating func encode(_ value: String, forKey key: Key) throws {
             guard let obj = self.value else { return }
-            let strVal = yyjson_mut_strcpy(doc, value)
-            let keyVal = yyjson_mut_strcpy(doc, key.stringValue)
+            let strVal = yyFromString(value, in: doc)
+            let keyVal = yyFromString(key.stringValue, in: doc)
             _ = yyjson_mut_obj_put(obj, keyVal, strVal)
         }
 
         mutating func encode(_ value: Double, forKey key: Key) throws {
             guard let obj = self.value else { return }
             let numVal = yyjson_mut_real(doc, value)
-            let keyVal = yyjson_mut_strcpy(doc, key.stringValue)
+            let keyVal = yyFromString(key.stringValue, in: doc)
             _ = yyjson_mut_obj_put(obj, keyVal, numVal)
         }
 
@@ -241,7 +256,7 @@ import Foundation
         mutating func encode(_ value: Int, forKey key: Key) throws {
             guard let obj = self.value else { return }
             let numVal = yyjson_mut_sint(doc, Int64(value))
-            let keyVal = yyjson_mut_strcpy(doc, key.stringValue)
+            let keyVal = yyFromString(key.stringValue, in: doc)
             _ = yyjson_mut_obj_put(obj, keyVal, numVal)
         }
 
@@ -260,14 +275,14 @@ import Foundation
         mutating func encode(_ value: Int64, forKey key: Key) throws {
             guard let obj = self.value else { return }
             let numVal = yyjson_mut_sint(doc, value)
-            let keyVal = yyjson_mut_strcpy(doc, key.stringValue)
+            let keyVal = yyFromString(key.stringValue, in: doc)
             _ = yyjson_mut_obj_put(obj, keyVal, numVal)
         }
 
         mutating func encode(_ value: UInt, forKey key: Key) throws {
             guard let obj = self.value else { return }
             let numVal = yyjson_mut_uint(doc, UInt64(value))
-            let keyVal = yyjson_mut_strcpy(doc, key.stringValue)
+            let keyVal = yyFromString(key.stringValue, in: doc)
             _ = yyjson_mut_obj_put(obj, keyVal, numVal)
         }
 
@@ -286,7 +301,7 @@ import Foundation
         mutating func encode(_ value: UInt64, forKey key: Key) throws {
             guard let obj = self.value else { return }
             let numVal = yyjson_mut_uint(doc, value)
-            let keyVal = yyjson_mut_strcpy(doc, key.stringValue)
+            let keyVal = yyFromString(key.stringValue, in: doc)
             _ = yyjson_mut_obj_put(obj, keyVal, numVal)
         }
 
@@ -295,14 +310,14 @@ import Foundation
 
             if let date = value as? Date {
                 let encodedValue = try encodeDate(date, codingPath: codingPath + [key])
-                let keyVal = yyjson_mut_strcpy(doc, key.stringValue)
+                let keyVal = yyFromString(key.stringValue, in: doc)
                 _ = yyjson_mut_obj_put(obj, keyVal, encodedValue)
                 return
             }
 
             if let data = value as? Data {
                 let encodedValue = try encodeData(data, codingPath: codingPath + [key])
-                let keyVal = yyjson_mut_strcpy(doc, key.stringValue)
+                let keyVal = yyFromString(key.stringValue, in: doc)
                 _ = yyjson_mut_obj_put(obj, keyVal, encodedValue)
                 return
             }
@@ -316,7 +331,7 @@ import Foundation
                 dataEncodingStrategy: dataEncodingStrategy
             )
             let encodedValue = try encodeValue(value, using: encoder)
-            let keyVal = yyjson_mut_strcpy(doc, key.stringValue)
+            let keyVal = yyFromString(key.stringValue, in: doc)
             _ = yyjson_mut_obj_put(obj, keyVal, encodedValue)
         }
 
@@ -335,7 +350,7 @@ import Foundation
                 return encoder.container(keyedBy: type)
             }
             let nestedObj = yyjson_mut_obj(doc)
-            let keyVal = yyjson_mut_strcpy(doc, key.stringValue)
+            let keyVal = yyFromString(key.stringValue, in: doc)
             _ = yyjson_mut_obj_put(obj, keyVal, nestedObj)
             let encoder = _YYEncoder(
                 doc: doc,
@@ -361,7 +376,7 @@ import Foundation
                 return nestedEncoder.unkeyedContainer()
             }
             let nestedArr = yyjson_mut_arr(doc)
-            let keyVal = yyjson_mut_strcpy(doc, key.stringValue)
+            let keyVal = yyFromString(key.stringValue, in: doc)
             _ = yyjson_mut_obj_put(obj, keyVal, nestedArr)
             let nestedEncoder = _YYEncoder(
                 doc: doc,
@@ -405,7 +420,7 @@ import Foundation
                 )
             }
             let nestedObj = yyjson_mut_obj(doc)
-            let keyVal = yyjson_mut_strcpy(doc, key.stringValue)
+            let keyVal = yyFromString(key.stringValue, in: doc)
             _ = yyjson_mut_obj_put(obj, keyVal, nestedObj)
             return _YYEncoder(
                 doc: doc,
@@ -443,7 +458,7 @@ import Foundation
                 let formatter = ISO8601DateFormatter()
                 formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
                 let string = formatter.string(from: date)
-                return yyjson_mut_strcpy(doc, string)
+                return yyFromString(string, in: doc)
 
             case .secondsSince1970:
                 return yyjson_mut_real(doc, date.timeIntervalSince1970)
@@ -453,7 +468,7 @@ import Foundation
 
             case .formatted(let formatter):
                 let string = formatter.string(from: date)
-                return yyjson_mut_strcpy(doc, string)
+                return yyFromString(string, in: doc)
 
             case .custom(let closure):
                 let encoder = _YYEncoder(
@@ -481,7 +496,7 @@ import Foundation
             switch dataEncodingStrategy {
             case .base64:
                 let string = data.base64EncodedString()
-                return yyjson_mut_strcpy(doc, string)
+                return yyFromString(string, in: doc)
 
             case .deferredToData:
                 let encoder = _YYEncoder(
@@ -587,7 +602,7 @@ import Foundation
 
         mutating func encode(_ value: String) throws {
             guard let arr = self.value else { return }
-            let strVal = yyjson_mut_strcpy(doc, value)
+            let strVal = yyFromString(value, in: doc)
             _ = yyjson_mut_arr_append(arr, strVal)
         }
 
@@ -755,7 +770,7 @@ import Foundation
                 let formatter = ISO8601DateFormatter()
                 formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
                 let string = formatter.string(from: date)
-                return yyjson_mut_strcpy(doc, string)
+                return yyFromString(string, in: doc)
 
             case .secondsSince1970:
                 return yyjson_mut_real(doc, date.timeIntervalSince1970)
@@ -765,7 +780,7 @@ import Foundation
 
             case .formatted(let formatter):
                 let string = formatter.string(from: date)
-                return yyjson_mut_strcpy(doc, string)
+                return yyFromString(string, in: doc)
 
             case .custom(let closure):
                 let encoder = _YYEncoder(
@@ -793,7 +808,7 @@ import Foundation
             switch dataEncodingStrategy {
             case .base64:
                 let string = data.base64EncodedString()
-                return yyjson_mut_strcpy(doc, string)
+                return yyFromString(string, in: doc)
 
             case .deferredToData:
                 let encoder = _YYEncoder(
@@ -886,7 +901,7 @@ import Foundation
         }
 
         mutating func encode(_ value: String) throws {
-            self.value = yyjson_mut_strcpy(doc, value)
+            self.value = yyFromString(value, in: doc)
             encoder.value = self.value
         }
 
@@ -993,7 +1008,7 @@ import Foundation
                 let formatter = ISO8601DateFormatter()
                 formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
                 let string = formatter.string(from: date)
-                return yyjson_mut_strcpy(doc, string)
+                return yyFromString(string, in: doc)
 
             case .secondsSince1970:
                 return yyjson_mut_real(doc, date.timeIntervalSince1970)
@@ -1003,7 +1018,7 @@ import Foundation
 
             case .formatted(let formatter):
                 let string = formatter.string(from: date)
-                return yyjson_mut_strcpy(doc, string)
+                return yyFromString(string, in: doc)
 
             case .custom(let closure):
                 let nestedEncoder = _YYEncoder(
@@ -1029,7 +1044,7 @@ import Foundation
             switch dataEncodingStrategy {
             case .base64:
                 let string = data.base64EncodedString()
-                return yyjson_mut_strcpy(doc, string)
+                return yyFromString(string, in: doc)
 
             case .deferredToData:
                 let nestedEncoder = _YYEncoder(

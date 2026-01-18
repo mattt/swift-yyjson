@@ -274,7 +274,7 @@ import Foundation
         ///   or `nil` if not found or not an object.
         public subscript(key: String) -> YYJSONValue? {
             guard case .object(let ptr) = kind else { return nil }
-            guard let val = yyjson_obj_get(ptr, key) else { return nil }
+            guard let val = yyObjGet(ptr, key: key) else { return nil }
             return YYJSONValue(value: val, document: document)
         }
 
@@ -377,7 +377,7 @@ import Foundation
         /// - Parameter key: The key to look up.
         /// - Returns: The value at the key, or `nil` if not found.
         public subscript(key: String) -> YYJSONValue? {
-            guard let val = yyjson_obj_get(value, key) else {
+            guard let val = yyObjGet(value, key: key) else {
                 return nil
             }
             return YYJSONValue(value: val, document: document)
@@ -388,7 +388,7 @@ import Foundation
         /// - Parameter key: The key to check.
         /// - Returns: `true` if the key exists; otherwise, `false`.
         public func contains(_ key: String) -> Bool {
-            yyjson_obj_get(value, key) != nil
+            yyObjGet(value, key: key) != nil
         }
 
         /// All keys in the object.
