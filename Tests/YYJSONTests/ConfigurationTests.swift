@@ -601,7 +601,7 @@ import Testing
             let decoder = YYJSONDecoder()
             switch decoder.nonConformingFloatDecodingStrategy {
             case .throw:
-                #expect(true)
+                #expect(Bool(true))
             default:
                 Issue.record("Default should be .throw")
             }
