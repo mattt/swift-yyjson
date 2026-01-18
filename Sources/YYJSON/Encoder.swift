@@ -8,11 +8,13 @@ import Foundation
     @inline(__always)
     func yyFromString(_ string: String, in doc: UnsafeMutablePointer<yyjson_mut_doc>) -> UnsafeMutablePointer<
         yyjson_mut_val
-    >? {
+    > {
         var tmp = string
         return tmp.withUTF8 { buf in
-            guard let ptr = buf.baseAddress else { return nil }
-            return yyjson_mut_strncpy(doc, ptr, buf.count)
+            if let ptr = buf.baseAddress {
+                return yyjson_mut_strncpy(doc, ptr, buf.count)
+            }
+            return yyjson_mut_strn(doc, "", 0)
         }
     }
 
@@ -456,7 +458,7 @@ import Foundation
                 let formatter = ISO8601DateFormatter()
                 formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
                 let string = formatter.string(from: date)
-                return yyFromString(string, in: doc)!
+                return yyFromString(string, in: doc)
 
             case .secondsSince1970:
                 return yyjson_mut_real(doc, date.timeIntervalSince1970)
@@ -466,7 +468,7 @@ import Foundation
 
             case .formatted(let formatter):
                 let string = formatter.string(from: date)
-                return yyFromString(string, in: doc)!
+                return yyFromString(string, in: doc)
 
             case .custom(let closure):
                 let encoder = _YYEncoder(
@@ -494,7 +496,7 @@ import Foundation
             switch dataEncodingStrategy {
             case .base64:
                 let string = data.base64EncodedString()
-                return yyFromString(string, in: doc)!
+                return yyFromString(string, in: doc)
 
             case .deferredToData:
                 let encoder = _YYEncoder(
@@ -768,7 +770,7 @@ import Foundation
                 let formatter = ISO8601DateFormatter()
                 formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
                 let string = formatter.string(from: date)
-                return yyFromString(string, in: doc)!
+                return yyFromString(string, in: doc)
 
             case .secondsSince1970:
                 return yyjson_mut_real(doc, date.timeIntervalSince1970)
@@ -778,7 +780,7 @@ import Foundation
 
             case .formatted(let formatter):
                 let string = formatter.string(from: date)
-                return yyFromString(string, in: doc)!
+                return yyFromString(string, in: doc)
 
             case .custom(let closure):
                 let encoder = _YYEncoder(
@@ -806,7 +808,7 @@ import Foundation
             switch dataEncodingStrategy {
             case .base64:
                 let string = data.base64EncodedString()
-                return yyFromString(string, in: doc)!
+                return yyFromString(string, in: doc)
 
             case .deferredToData:
                 let encoder = _YYEncoder(
@@ -1006,7 +1008,7 @@ import Foundation
                 let formatter = ISO8601DateFormatter()
                 formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
                 let string = formatter.string(from: date)
-                return yyFromString(string, in: doc)!
+                return yyFromString(string, in: doc)
 
             case .secondsSince1970:
                 return yyjson_mut_real(doc, date.timeIntervalSince1970)
@@ -1016,7 +1018,7 @@ import Foundation
 
             case .formatted(let formatter):
                 let string = formatter.string(from: date)
-                return yyFromString(string, in: doc)!
+                return yyFromString(string, in: doc)
 
             case .custom(let closure):
                 let nestedEncoder = _YYEncoder(
@@ -1042,7 +1044,7 @@ import Foundation
             switch dataEncodingStrategy {
             case .base64:
                 let string = data.base64EncodedString()
-                return yyFromString(string, in: doc)!
+                return yyFromString(string, in: doc)
 
             case .deferredToData:
                 let nestedEncoder = _YYEncoder(
