@@ -13,6 +13,15 @@ import Foundation
         return String(decoding: buf, as: UTF8.self)
     }
 
+    @inline(__always)
+    func yyObjGet(_ obj: UnsafeMutablePointer<yyjson_val>, key: String) -> UnsafeMutablePointer<yyjson_val>? {
+        var tmp = key
+        return tmp.withUTF8 { buf in
+            guard let ptr = buf.baseAddress else { return nil }
+            return yyjson_obj_getn(obj, ptr, buf.count)
+        }
+    }
+
     /// A decoder that decodes JSON data into Swift types using the yyjson library.
     public struct YYJSONDecoder {
         /// Options for reading JSON.
@@ -371,7 +380,7 @@ import Foundation
 
         func contains(_ key: Key) -> Bool {
             let jsonKey = encodeKey(key)
-            return yyjson_obj_get(value, jsonKey) != nil
+            return yyObjGet(value, key: jsonKey) != nil
         }
 
         private func decodeKey(_ jsonKey: String) -> CodingKey {
@@ -438,7 +447,7 @@ import Foundation
 
         func decodeNil(forKey key: Key) throws -> Bool {
             let jsonKey = encodeKey(key)
-            guard let val = yyjson_obj_get(value, jsonKey) else {
+            guard let val = yyObjGet(value, key: jsonKey) else {
                 return true
             }
             return yyjson_is_null(val)
@@ -649,7 +658,7 @@ import Foundation
 
         func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable {
             let jsonKey = encodeKey(key)
-            let val = yyjson_obj_get(value, jsonKey)
+            let val = yyObjGet(value, key: jsonKey)
 
             // Handle special types
             if type == Date.self {
@@ -855,7 +864,7 @@ import Foundation
             -> KeyedDecodingContainer<NestedKey> where NestedKey: CodingKey
         {
             let jsonKey = encodeKey(key)
-            let val = yyjson_obj_get(value, jsonKey)
+            let val = yyObjGet(value, key: jsonKey)
             let decoder = _YYDecoder(
                 value: val,
                 codingPath: codingPath + [key],
@@ -870,7 +879,7 @@ import Foundation
 
         func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer {
             let jsonKey = encodeKey(key)
-            let val = yyjson_obj_get(value, jsonKey)
+            let val = yyObjGet(value, key: jsonKey)
             let decoder = _YYDecoder(
                 value: val,
                 codingPath: codingPath + [key],
@@ -897,7 +906,7 @@ import Foundation
 
         func superDecoder(forKey key: Key) throws -> Decoder {
             let jsonKey = encodeKey(key)
-            let val = yyjson_obj_get(value, jsonKey)
+            let val = yyObjGet(value, key: jsonKey)
             return _YYDecoder(
                 value: val,
                 codingPath: codingPath + [key],
@@ -914,7 +923,7 @@ import Foundation
             _ block: (UnsafeMutablePointer<yyjson_val>) throws -> T
         ) throws -> T {
             let jsonKey = encodeKey(key)
-            guard let val = yyjson_obj_get(value, jsonKey) else {
+            guard let val = yyObjGet(value, key: jsonKey) else {
                 throw YYJSONError.missingKey(key.stringValue, path: pathString(for: key))
             }
             return try block(val)
