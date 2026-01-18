@@ -203,75 +203,77 @@ public enum YYJSONSerialization {
         }
     }
 
-    private static func foundationObjectToYYJSON(
-        _ obj: Any,
-        doc: UnsafeMutablePointer<yyjson_mut_doc>,
-        options: WritingOptions
-    ) throws -> UnsafeMutablePointer<yyjson_mut_val> {
-        switch obj {
-        case let str as NSString:
-            return yyFromString(str as String, in: doc)!
+    #if !YYJSON_DISABLE_WRITER
+        private static func foundationObjectToYYJSON(
+            _ obj: Any,
+            doc: UnsafeMutablePointer<yyjson_mut_doc>,
+            options: WritingOptions
+        ) throws -> UnsafeMutablePointer<yyjson_mut_val> {
+            switch obj {
+            case let str as NSString:
+                return yyFromString(str as String, in: doc)
 
-        case let num as NSNumber:
-            let doubleValue = num.doubleValue
-            if doubleValue.isNaN || doubleValue.isInfinite {
-                throw YYJSONError.invalidData("NaN or Infinity not allowed in JSON")
-            }
-
-            if CFGetTypeID(num) == CFBooleanGetTypeID() {
-                return yyjson_mut_bool(doc, num.boolValue)
-            }
-
-            let objCType = num.objCType.pointee
-            switch objCType {
-            case 0x63, 0x73, 0x69, 0x6C, 0x71:  // 'c', 's', 'i', 'l', 'q' (signed integers)
-                return yyjson_mut_sint(doc, num.int64Value)
-            case 0x43, 0x53, 0x49, 0x4C, 0x51:  // 'C', 'S', 'I', 'L', 'Q' (unsigned integers)
-                return yyjson_mut_uint(doc, num.uint64Value)
-            default:
-                return yyjson_mut_real(doc, doubleValue)
-            }
-
-        case is NSNull:
-            return yyjson_mut_null(doc)
-
-        case let arr as NSArray:
-            guard let jsonArr = yyjson_mut_arr(doc) else {
-                throw YYJSONError.invalidData("Failed to create array")
-            }
-            for element in arr {
-                let elementVal = try foundationObjectToYYJSON(element, doc: doc, options: options)
-                _ = yyjson_mut_arr_append(jsonArr, elementVal)
-            }
-            return jsonArr
-
-        case let dict as NSDictionary:
-            guard let jsonObj = yyjson_mut_obj(doc) else {
-                throw YYJSONError.invalidData("Failed to create object")
-            }
-
-            let keys: [Any]
-            if options.contains(.sortedKeys) {
-                keys = (dict.allKeys as? [String])?.sorted() ?? dict.allKeys
-            } else {
-                keys = dict.allKeys
-            }
-
-            for key in keys {
-                guard let keyString = key as? String else {
-                    throw YYJSONError.invalidData("Dictionary keys must be strings")
+            case let num as NSNumber:
+                let doubleValue = num.doubleValue
+                if doubleValue.isNaN || doubleValue.isInfinite {
+                    throw YYJSONError.invalidData("NaN or Infinity not allowed in JSON")
                 }
-                guard let value = dict[key] else { continue }
-                let keyVal = yyFromString(keyString, in: doc)!
-                let valueVal = try foundationObjectToYYJSON(value, doc: doc, options: options)
-                _ = yyjson_mut_obj_put(jsonObj, keyVal, valueVal)
-            }
-            return jsonObj
 
-        default:
-            throw YYJSONError.invalidData("Unsupported Foundation type: \(type(of: obj))")
+                if CFGetTypeID(num) == CFBooleanGetTypeID() {
+                    return yyjson_mut_bool(doc, num.boolValue)
+                }
+
+                let objCType = num.objCType.pointee
+                switch objCType {
+                case 0x63, 0x73, 0x69, 0x6C, 0x71:  // 'c', 's', 'i', 'l', 'q' (signed integers)
+                    return yyjson_mut_sint(doc, num.int64Value)
+                case 0x43, 0x53, 0x49, 0x4C, 0x51:  // 'C', 'S', 'I', 'L', 'Q' (unsigned integers)
+                    return yyjson_mut_uint(doc, num.uint64Value)
+                default:
+                    return yyjson_mut_real(doc, doubleValue)
+                }
+
+            case is NSNull:
+                return yyjson_mut_null(doc)
+
+            case let arr as NSArray:
+                guard let jsonArr = yyjson_mut_arr(doc) else {
+                    throw YYJSONError.invalidData("Failed to create array")
+                }
+                for element in arr {
+                    let elementVal = try foundationObjectToYYJSON(element, doc: doc, options: options)
+                    _ = yyjson_mut_arr_append(jsonArr, elementVal)
+                }
+                return jsonArr
+
+            case let dict as NSDictionary:
+                guard let jsonObj = yyjson_mut_obj(doc) else {
+                    throw YYJSONError.invalidData("Failed to create object")
+                }
+
+                let keys: [Any]
+                if options.contains(.sortedKeys) {
+                    keys = (dict.allKeys as? [String])?.sorted() ?? dict.allKeys
+                } else {
+                    keys = dict.allKeys
+                }
+
+                for key in keys {
+                    guard let keyString = key as? String else {
+                        throw YYJSONError.invalidData("Dictionary keys must be strings")
+                    }
+                    guard let value = dict[key] else { continue }
+                    let keyVal = yyFromString(keyString, in: doc)
+                    let valueVal = try foundationObjectToYYJSON(value, doc: doc, options: options)
+                    _ = yyjson_mut_obj_put(jsonObj, keyVal, valueVal)
+                }
+                return jsonObj
+
+            default:
+                throw YYJSONError.invalidData("Unsupported Foundation type: \(type(of: obj))")
+            }
         }
-    }
+    #endif  // !YYJSON_DISABLE_WRITER
 }
 
 // MARK: - YYJSONValue to Foundation Conversion
