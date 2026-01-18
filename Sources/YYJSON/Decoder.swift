@@ -3,6 +3,16 @@ import Foundation
 
 #if !YYJSON_DISABLE_READER
 
+    // MARK: - Helper Functions
+
+    @inline(__always)
+    func yyToString(_ val: UnsafeMutablePointer<yyjson_val>) -> String {
+        let ptr = unsafe_yyjson_get_str(val)!
+        let len = unsafe_yyjson_get_len(val)
+        let buf = UnsafeBufferPointer(start: UnsafeRawPointer(ptr).assumingMemoryBound(to: UInt8.self), count: len)
+        return String(decoding: buf, as: UTF8.self)
+    }
+
     /// A decoder that decodes JSON data into Swift types using the yyjson library.
     public struct YYJSONDecoder {
         /// Options for reading JSON.
@@ -350,12 +360,10 @@ import Foundation
             var keys: [Key] = []
             var iter = yyjson_obj_iter_with(value)
             while let keyVal = yyjson_obj_iter_next(&iter) {
-                if let keyStr = yyjson_get_str(keyVal) {
-                    let jsonKey = String(cString: keyStr)
-                    let decodedKey = decodeKey(jsonKey)
-                    if let key = Key(stringValue: decodedKey.stringValue) {
-                        keys.append(key)
-                    }
+                let jsonKey = yyToString(keyVal)
+                let decodedKey = decodeKey(jsonKey)
+                if let key = Key(stringValue: decodedKey.stringValue) {
+                    keys.append(key)
                 }
             }
             return keys
@@ -389,12 +397,10 @@ import Foundation
                 // This is less efficient but necessary for correctness
                 var iter = yyjson_obj_iter_with(value)
                 while let keyVal = yyjson_obj_iter_next(&iter) {
-                    if let keyStr = yyjson_get_str(keyVal) {
-                        let jsonKey = String(cString: keyStr)
-                        let decodedKey = decodeKey(jsonKey)
-                        if decodedKey.stringValue == key.stringValue {
-                            return jsonKey
-                        }
+                    let jsonKey = yyToString(keyVal)
+                    let decodedKey = decodeKey(jsonKey)
+                    if decodedKey.stringValue == key.stringValue {
+                        return jsonKey
                     }
                 }
                 return key.stringValue
@@ -447,8 +453,8 @@ import Foundation
                     let num = yyjson_get_real(val)
                     return num != 0.0
                 }
-                if yyjson_is_str(val), let str = yyjson_get_str(val) {
-                    let lowercased = String(cString: str).lowercased()
+                if yyjson_is_str(val) {
+                    let lowercased = yyToString(val).lowercased()
                     if lowercased == "true" || lowercased == "1" {
                         return true
                     }
@@ -466,8 +472,8 @@ import Foundation
 
         func decode(_ type: String.Type, forKey key: Key) throws -> String {
             try decodeValue(forKey: key) { val in
-                if yyjson_is_str(val), let str = yyjson_get_str(val) {
-                    return String(cString: str)
+                if yyjson_is_str(val) {
+                    return yyToString(val)
                 }
                 if yyjson_is_num(val) {
                     return String(yyjson_get_real(val))
@@ -502,8 +508,8 @@ import Foundation
 
                     return num
                 }
-                if yyjson_is_str(val), let str = yyjson_get_str(val) {
-                    let string = String(cString: str)
+                if yyjson_is_str(val) {
+                    let string = yyToString(val)
 
                     switch nonConformingFloatDecodingStrategy {
                     case .throw:
@@ -543,8 +549,8 @@ import Foundation
                     }
                     return Int(yyjson_get_real(val))
                 }
-                if yyjson_is_str(val), let str = yyjson_get_str(val) {
-                    if let num = Int(String(cString: str)) {
+                if yyjson_is_str(val) {
+                    if let num = Int(yyToString(val)) {
                         return num
                     }
                 }
@@ -576,8 +582,8 @@ import Foundation
                     }
                     return Int64(yyjson_get_real(val))
                 }
-                if yyjson_is_str(val), let str = yyjson_get_str(val) {
-                    if let num = Int64(String(cString: str)) {
+                if yyjson_is_str(val) {
+                    if let num = Int64(yyToString(val)) {
                         return num
                     }
                 }
@@ -598,8 +604,8 @@ import Foundation
                     }
                     return UInt(yyjson_get_real(val))
                 }
-                if yyjson_is_str(val), let str = yyjson_get_str(val) {
-                    if let num = UInt(String(cString: str)) {
+                if yyjson_is_str(val) {
+                    if let num = UInt(yyToString(val)) {
                         return num
                     }
                 }
@@ -628,8 +634,8 @@ import Foundation
                 if yyjson_is_num(val) {
                     return yyjson_get_uint(val)
                 }
-                if yyjson_is_str(val), let str = yyjson_get_str(val) {
-                    if let num = UInt64(String(cString: str)) {
+                if yyjson_is_str(val) {
+                    if let num = UInt64(yyToString(val)) {
                         return num
                     }
                 }
@@ -690,14 +696,14 @@ import Foundation
                 return try Date(from: decoder)
 
             case .iso8601:
-                guard yyjson_is_str(value), let str = yyjson_get_str(value) else {
+                guard yyjson_is_str(value) else {
                     throw YYJSONError.typeMismatch(
                         expected: "string",
                         actual: typeString(value),
                         path: path
                     )
                 }
-                let string = String(cString: str)
+                let string = yyToString(value)
                 let formatter = ISO8601DateFormatter()
                 formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
                 if let date = formatter.date(from: string) {
@@ -722,14 +728,14 @@ import Foundation
                 return Date(timeIntervalSince1970: milliseconds / 1000.0)
 
             case .formatted(let formatter):
-                guard yyjson_is_str(value), let str = yyjson_get_str(value) else {
+                guard yyjson_is_str(value) else {
                     throw YYJSONError.typeMismatch(
                         expected: "string",
                         actual: typeString(value),
                         path: path
                     )
                 }
-                let string = String(cString: str)
+                let string = yyToString(value)
                 guard let date = formatter.date(from: string) else {
                     throw YYJSONError.invalidData(
                         "Date string does not match format expected by formatter",
@@ -761,14 +767,14 @@ import Foundation
 
             switch dataDecodingStrategy {
             case .base64:
-                guard yyjson_is_str(value), let str = yyjson_get_str(value) else {
+                guard yyjson_is_str(value) else {
                     throw YYJSONError.typeMismatch(
                         expected: "string",
                         actual: typeString(value),
                         path: path
                     )
                 }
-                let string = String(cString: str)
+                let string = yyToString(value)
                 guard let data = Data(base64Encoded: string) else {
                     throw YYJSONError.invalidData(
                         "Encountered Base64-encoded string that cannot be decoded",
@@ -968,12 +974,7 @@ import Foundation
         }
 
         var count: Int? {
-            var count = 0
-            var iter = yyjson_arr_iter_with(value)
-            while yyjson_arr_iter_next(&iter) != nil {
-                count += 1
-            }
-            return count
+            Int(yyjson_arr_size(value))
         }
 
         var isAtEnd: Bool {
@@ -1013,8 +1014,8 @@ import Foundation
                 throw YYJSONError.missingValue(path: pathString)
             }
             currentIndex += 1
-            if yyjson_is_str(val), let str = yyjson_get_str(val) {
-                return String(cString: str)
+            if yyjson_is_str(val) {
+                return yyToString(val)
             }
             throw YYJSONError.typeMismatch(
                 expected: "string",
@@ -1045,8 +1046,8 @@ import Foundation
 
                 return num
             }
-            if yyjson_is_str(val), let str = yyjson_get_str(val) {
-                let string = String(cString: str)
+            if yyjson_is_str(val) {
+                let string = yyToString(val)
 
                 switch nonConformingFloatDecodingStrategy {
                 case .throw:
@@ -1215,14 +1216,14 @@ import Foundation
                 return try Date(from: decoder)
 
             case .iso8601:
-                guard yyjson_is_str(value), let str = yyjson_get_str(value) else {
+                guard yyjson_is_str(value) else {
                     throw YYJSONError.typeMismatch(
                         expected: "string",
                         actual: typeString(value),
                         path: path
                     )
                 }
-                let string = String(cString: str)
+                let string = yyToString(value)
                 let formatter = ISO8601DateFormatter()
                 formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
                 if let date = formatter.date(from: string) {
@@ -1246,14 +1247,14 @@ import Foundation
                 return Date(timeIntervalSince1970: milliseconds / 1000.0)
 
             case .formatted(let formatter):
-                guard yyjson_is_str(value), let str = yyjson_get_str(value) else {
+                guard yyjson_is_str(value) else {
                     throw YYJSONError.typeMismatch(
                         expected: "string",
                         actual: typeString(value),
                         path: path
                     )
                 }
-                let string = String(cString: str)
+                let string = yyToString(value)
                 guard let date = formatter.date(from: string) else {
                     throw YYJSONError.invalidData(
                         "Date string does not match format expected by formatter",
@@ -1281,14 +1282,14 @@ import Foundation
         {
             switch dataDecodingStrategy {
             case .base64:
-                guard yyjson_is_str(value), let str = yyjson_get_str(value) else {
+                guard yyjson_is_str(value) else {
                     throw YYJSONError.typeMismatch(
                         expected: "string",
                         actual: typeString(value),
                         path: path
                     )
                 }
-                let string = String(cString: str)
+                let string = yyToString(value)
                 guard let data = Data(base64Encoded: string) else {
                     throw YYJSONError.invalidData(
                         "Encountered Base64-encoded string that cannot be decoded",
@@ -1447,8 +1448,8 @@ import Foundation
             guard let val = value else {
                 throw YYJSONError.missingValue(path: pathString)
             }
-            if yyjson_is_str(val), let str = yyjson_get_str(val) {
-                return String(cString: str)
+            if yyjson_is_str(val) {
+                return yyToString(val)
             }
             throw YYJSONError.typeMismatch(
                 expected: "string",
@@ -1478,8 +1479,8 @@ import Foundation
 
                 return num
             }
-            if yyjson_is_str(val), let str = yyjson_get_str(val) {
-                let string = String(cString: str)
+            if yyjson_is_str(val) {
+                let string = yyToString(val)
 
                 switch nonConformingFloatDecodingStrategy {
                 case .throw:
@@ -1643,14 +1644,14 @@ import Foundation
                 return try Date(from: decoder)
 
             case .iso8601:
-                guard yyjson_is_str(value), let str = yyjson_get_str(value) else {
+                guard yyjson_is_str(value) else {
                     throw YYJSONError.typeMismatch(
                         expected: "string",
                         actual: typeString(value),
                         path: path
                     )
                 }
-                let string = String(cString: str)
+                let string = yyToString(value)
                 let formatter = ISO8601DateFormatter()
                 formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
                 if let date = formatter.date(from: string) {
@@ -1674,14 +1675,14 @@ import Foundation
                 return Date(timeIntervalSince1970: milliseconds / 1000.0)
 
             case .formatted(let formatter):
-                guard yyjson_is_str(value), let str = yyjson_get_str(value) else {
+                guard yyjson_is_str(value) else {
                     throw YYJSONError.typeMismatch(
                         expected: "string",
                         actual: typeString(value),
                         path: path
                     )
                 }
-                let string = String(cString: str)
+                let string = yyToString(value)
                 guard let date = formatter.date(from: string) else {
                     throw YYJSONError.invalidData(
                         "Date string does not match format expected by formatter",
@@ -1709,14 +1710,14 @@ import Foundation
         {
             switch dataDecodingStrategy {
             case .base64:
-                guard yyjson_is_str(value), let str = yyjson_get_str(value) else {
+                guard yyjson_is_str(value) else {
                     throw YYJSONError.typeMismatch(
                         expected: "string",
                         actual: typeString(value),
                         path: path
                     )
                 }
-                let string = String(cString: str)
+                let string = yyToString(value)
                 guard let data = Data(base64Encoded: string) else {
                     throw YYJSONError.invalidData(
                         "Encountered Base64-encoded string that cannot be decoded",
