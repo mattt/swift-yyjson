@@ -459,7 +459,7 @@ import Foundation
                     return yyjson_get_bool(val)
                 }
                 if yyjson_is_num(val) {
-                    let num = yyjson_get_real(val)
+                    let num = yyjson_get_num(val)
                     return num != 0.0
                 }
                 if yyjson_is_str(val) {
@@ -485,7 +485,7 @@ import Foundation
                     return yyToString(val)
                 }
                 if yyjson_is_num(val) {
-                    return String(yyjson_get_real(val))
+                    return String(yyjson_get_num(val))
                 }
                 if yyjson_is_bool(val) {
                     return yyjson_get_bool(val) ? "true" : "false"
@@ -501,7 +501,7 @@ import Foundation
         func decode(_ type: Double.Type, forKey key: Key) throws -> Double {
             try decodeValue(forKey: key) { val in
                 if yyjson_is_num(val) {
-                    let num = yyjson_get_real(val)
+                    let num = yyjson_get_num(val)
 
                     if !num.isFinite {
                         switch nonConformingFloatDecodingStrategy {
@@ -556,7 +556,7 @@ import Foundation
                         let sint = yyjson_get_sint(val)
                         return Int(sint)
                     }
-                    return Int(yyjson_get_real(val))
+                    return Int(yyjson_get_num(val))
                 }
                 if yyjson_is_str(val) {
                     if let num = Int(yyToString(val)) {
@@ -589,7 +589,7 @@ import Foundation
                     if yyjson_is_int(val) {
                         return yyjson_get_sint(val)
                     }
-                    return Int64(yyjson_get_real(val))
+                    return Int64(yyjson_get_num(val))
                 }
                 if yyjson_is_str(val) {
                     if let num = Int64(yyToString(val)) {
@@ -611,7 +611,7 @@ import Foundation
                         let uint = yyjson_get_uint(val)
                         return UInt(uint)
                     }
-                    return UInt(yyjson_get_real(val))
+                    return UInt(yyjson_get_num(val))
                 }
                 if yyjson_is_str(val) {
                     if let num = UInt(yyToString(val)) {
@@ -824,7 +824,7 @@ import Foundation
             path: String
         ) throws -> T where T: BinaryFloatingPoint {
             if yyjson_is_num(value) {
-                let num = yyjson_get_real(value)
+                let num = yyjson_get_num(value)
 
                 // Check for non-conforming floats
                 if !num.isFinite {
@@ -1039,7 +1039,7 @@ import Foundation
             }
             currentIndex += 1
             if yyjson_is_num(val) {
-                let num = yyjson_get_real(val)
+                let num = yyjson_get_num(val)
 
                 if !num.isFinite {
                     switch nonConformingFloatDecodingStrategy {
@@ -1095,7 +1095,7 @@ import Foundation
                 if yyjson_is_int(val) {
                     return Int(yyjson_get_sint(val))
                 }
-                return Int(yyjson_get_real(val))
+                return Int(yyjson_get_num(val))
             }
             throw YYJSONError.typeMismatch(
                 expected: "integer",
@@ -1125,7 +1125,7 @@ import Foundation
                 if yyjson_is_int(val) {
                     return yyjson_get_sint(val)
                 }
-                return Int64(yyjson_get_real(val))
+                return Int64(yyjson_get_num(val))
             }
             throw YYJSONError.typeMismatch(
                 expected: "integer",
@@ -1143,7 +1143,7 @@ import Foundation
                 if yyjson_is_int(val) {
                     return UInt(yyjson_get_uint(val))
                 }
-                return UInt(yyjson_get_real(val))
+                return UInt(yyjson_get_num(val))
             }
             throw YYJSONError.typeMismatch(
                 expected: "unsigned integer",
@@ -1472,7 +1472,7 @@ import Foundation
                 throw YYJSONError.missingValue(path: pathString)
             }
             if yyjson_is_num(val) {
-                let num = yyjson_get_real(val)
+                let num = yyjson_get_num(val)
 
                 if !num.isFinite {
                     switch nonConformingFloatDecodingStrategy {
@@ -1527,7 +1527,7 @@ import Foundation
                 if yyjson_is_int(val) {
                     return Int(yyjson_get_sint(val))
                 }
-                return Int(yyjson_get_real(val))
+                return Int(yyjson_get_num(val))
             }
             throw YYJSONError.typeMismatch(
                 expected: "integer",
@@ -1556,7 +1556,7 @@ import Foundation
                 if yyjson_is_int(val) {
                     return yyjson_get_sint(val)
                 }
-                return Int64(yyjson_get_real(val))
+                return Int64(yyjson_get_num(val))
             }
             throw YYJSONError.typeMismatch(
                 expected: "integer",
@@ -1573,7 +1573,7 @@ import Foundation
                 if yyjson_is_int(val) {
                     return UInt(yyjson_get_uint(val))
                 }
-                return UInt(yyjson_get_real(val))
+                return UInt(yyjson_get_num(val))
             }
             throw YYJSONError.typeMismatch(
                 expected: "unsigned integer",

@@ -832,6 +832,107 @@ import Testing
         }
     }
 
+    // MARK: - Numeric Type Coercion Tests
+
+    @Suite("YYJSONDecoder - Numeric Type Coercion")
+    struct DecoderNumericCoercionTests {
+        // Bug: JSON integer should be decodable as Swift Double
+        // https://github.com/user/swift-yyjson/issues/XXX
+
+        @Test func decodeJSONIntegerAsDouble() throws {
+            // JSON integer 1 should decode as Double 1.0
+            let json = "1"
+            let data = json.data(using: .utf8)!
+            let decoder = YYJSONDecoder()
+            let result = try decoder.decode(Double.self, from: data)
+            #expect(result == 1.0, "JSON integer 1 should decode as Double 1.0, got \(result)")
+        }
+
+        @Test func decodeJSONNegativeIntegerAsDouble() throws {
+            let json = "-42"
+            let data = json.data(using: .utf8)!
+            let decoder = YYJSONDecoder()
+            let result = try decoder.decode(Double.self, from: data)
+            #expect(result == -42.0, "JSON integer -42 should decode as Double -42.0, got \(result)")
+        }
+
+        @Test func decodeJSONZeroIntegerAsDouble() throws {
+            let json = "0"
+            let data = json.data(using: .utf8)!
+            let decoder = YYJSONDecoder()
+            let result = try decoder.decode(Double.self, from: data)
+            #expect(result == 0.0, "JSON integer 0 should decode as Double 0.0, got \(result)")
+        }
+
+        @Test func decodeJSONLargeIntegerAsDouble() throws {
+            let json = "9007199254740992"  // 2^53
+            let data = json.data(using: .utf8)!
+            let decoder = YYJSONDecoder()
+            let result = try decoder.decode(Double.self, from: data)
+            #expect(result == 9007199254740992.0)
+        }
+
+        @Test func decodeJSONIntegerAsFloat() throws {
+            let json = "42"
+            let data = json.data(using: .utf8)!
+            let decoder = YYJSONDecoder()
+            let result = try decoder.decode(Float.self, from: data)
+            #expect(result == 42.0, "JSON integer 42 should decode as Float 42.0, got \(result)")
+        }
+
+        // Real-world scenario from bug report: Color with alpha as integer
+        struct Color: Codable, Equatable {
+            let r, g, b, a: Double
+        }
+
+        @Test func decodeColorWithIntegerAlpha() throws {
+            // Simulates Figma API response where alpha is 1 instead of 1.0
+            let json = #"{"r": 0.5, "g": 0.5, "b": 0.5, "a": 1}"#
+            let data = json.data(using: .utf8)!
+            let decoder = YYJSONDecoder()
+            let result = try decoder.decode(Color.self, from: data)
+            #expect(result.r == 0.5)
+            #expect(result.g == 0.5)
+            #expect(result.b == 0.5)
+            #expect(result.a == 1.0, "Integer alpha 1 should decode as 1.0, got \(result.a)")
+        }
+
+        @Test func decodeColorWithMixedIntegerAndFloatComponents() throws {
+            let json = #"{"r": 1, "g": 0, "b": 0.5, "a": 1}"#
+            let data = json.data(using: .utf8)!
+            let decoder = YYJSONDecoder()
+            let result = try decoder.decode(Color.self, from: data)
+            #expect(result.r == 1.0, "Integer r=1 should decode as 1.0, got \(result.r)")
+            #expect(result.g == 0.0, "Integer g=0 should decode as 0.0, got \(result.g)")
+            #expect(result.b == 0.5)
+            #expect(result.a == 1.0, "Integer a=1 should decode as 1.0, got \(result.a)")
+        }
+
+        @Test func decodeJSONIntegerAsDoubleInArray() throws {
+            let json = "[1, 2.5, 3]"
+            let data = json.data(using: .utf8)!
+            let decoder = YYJSONDecoder()
+            let result = try decoder.decode([Double].self, from: data)
+            #expect(result[0] == 1.0, "Array element 1 should decode as 1.0, got \(result[0])")
+            #expect(result[1] == 2.5)
+            #expect(result[2] == 3.0, "Array element 3 should decode as 3.0, got \(result[2])")
+        }
+
+        // Verify Foundation JSONDecoder behavior for comparison
+        @Test func foundationDecoderBehaviorReference() throws {
+            let json = #"{"r": 0.5, "g": 0.5, "b": 0.5, "a": 1}"#
+            let data = json.data(using: .utf8)!
+            let foundationResult = try JSONDecoder().decode(Color.self, from: data)
+            #expect(foundationResult.a == 1.0, "Foundation: Integer alpha 1 should decode as 1.0")
+
+            let yyResult = try YYJSONDecoder().decode(Color.self, from: data)
+            #expect(
+                yyResult.a == foundationResult.a,
+                "YYJSONDecoder should match Foundation behavior: expected \(foundationResult.a), got \(yyResult.a)"
+            )
+        }
+    }
+
     // MARK: - Error Handling Tests
 
     @Suite("YYJSONDecoder - Error Handling")
