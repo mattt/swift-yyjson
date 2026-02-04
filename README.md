@@ -297,6 +297,32 @@ if let dict = object as? [String: Any] {
 }
 ```
 
+Configure output formatting with `WritingOptions`:
+
+```swift
+// 2-space indentation (useful for Xcode asset catalogs)
+let data = try YYJSONSerialization.data(
+    withJSONObject: dict,
+    options: [.prettyPrintedTwoSpaces, .sortedKeys]
+)
+
+// ASCII-only output with trailing newline
+let data = try YYJSONSerialization.data(
+    withJSONObject: dict,
+    options: [.escapeUnicode, .newlineAtEnd]
+)
+```
+
+Available writing options:
+
+- `.fragmentsAllowed` — Allow top-level values that aren't arrays or dictionaries
+- `.prettyPrinted` — Pretty print with 4-space indent
+- `.sortedKeys` — Sort dictionary keys lexicographically
+- `.withoutEscapingSlashes` — Don't escape `/` as `\/`
+- `.prettyPrintedTwoSpaces` — Pretty print with 2-space indent (overrides `.prettyPrinted`)
+- `.escapeUnicode` — Escape non-ASCII characters as `\uXXXX`
+- `.newlineAtEnd` — Add trailing newline `\n`
+
 ## Read and Write Options
 
 ### Reading Options

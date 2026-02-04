@@ -269,6 +269,118 @@ import Testing
                 _ = try YYJSONSerialization.data(withJSONObject: CustomClass())
             }
         }
+
+        // MARK: - prettyPrintedTwoSpaces
+
+        @Test func writePrettyPrintedTwoSpaces() throws {
+            let dict: NSDictionary = ["key": "value"]
+            let data = try YYJSONSerialization.data(
+                withJSONObject: dict,
+                options: [.prettyPrintedTwoSpaces]
+            )
+            let json = String(data: data, encoding: .utf8)!
+            // Should use 2-space indentation (not 4-space)
+            #expect(json.contains("  \"key\""))
+            #expect(!json.contains("    \"key\""))
+        }
+
+        @Test func writePrettyPrintedTwoSpacesOverridesPrettyPrinted() throws {
+            let dict: NSDictionary = ["a": 1]
+            let data = try YYJSONSerialization.data(
+                withJSONObject: dict,
+                options: [.prettyPrinted, .prettyPrintedTwoSpaces]
+            )
+            let json = String(data: data, encoding: .utf8)!
+            // 2-space should take priority
+            #expect(json.contains("  \"a\""))
+            #expect(!json.contains("    \"a\""))
+        }
+
+        @Test func writePrettyPrintedTwoSpacesWithSortedKeys() throws {
+            let dict: NSDictionary = ["b": 2, "a": 1]
+            let data = try YYJSONSerialization.data(
+                withJSONObject: dict,
+                options: [.prettyPrintedTwoSpaces, .sortedKeys]
+            )
+            let json = String(data: data, encoding: .utf8)!
+            // Check key order and indentation
+            let aIndex = json.range(of: "\"a\"")!.lowerBound
+            let bIndex = json.range(of: "\"b\"")!.lowerBound
+            #expect(aIndex < bIndex)  // a before b
+            #expect(json.contains("  \"a\""))  // 2-space indent
+        }
+
+        @Test func writePrettyPrintedTwoSpacesNestedStructure() throws {
+            let dict: NSDictionary = ["outer": ["inner": ["deep": 1]]]
+            let data = try YYJSONSerialization.data(
+                withJSONObject: dict,
+                options: [.prettyPrintedTwoSpaces]
+            )
+            let json = String(data: data, encoding: .utf8)!
+            // Verify 2-space indentation at each nesting level
+            #expect(json.contains("  \"outer\""))  // Level 1: 2 spaces
+            #expect(json.contains("    \"inner\""))  // Level 2: 4 spaces
+            #expect(json.contains("      \"deep\""))  // Level 3: 6 spaces
+        }
+
+        // MARK: - escapeUnicode
+
+        @Test func writeEscapeUnicode() throws {
+            let dict: NSDictionary = ["emoji": "🎉"]
+            let data = try YYJSONSerialization.data(
+                withJSONObject: dict,
+                options: [.escapeUnicode]
+            )
+            let json = String(data: data, encoding: .utf8)!
+            // Emoji should be escaped as \uXXXX
+            #expect(!json.contains("🎉"))
+            #expect(json.contains("\\u"))
+        }
+
+        @Test func writeEscapeUnicodeWithChinese() throws {
+            let dict: NSDictionary = ["text": "你好"]
+            let data = try YYJSONSerialization.data(
+                withJSONObject: dict,
+                options: [.escapeUnicode]
+            )
+            let json = String(data: data, encoding: .utf8)!
+            // Chinese characters should be escaped
+            #expect(!json.contains("你好"))
+            #expect(json.contains("\\u"))
+        }
+
+        // MARK: - newlineAtEnd
+
+        @Test func writeNewlineAtEnd() throws {
+            let dict: NSDictionary = ["a": 1]
+            let data = try YYJSONSerialization.data(
+                withJSONObject: dict,
+                options: [.newlineAtEnd]
+            )
+            let json = String(data: data, encoding: .utf8)!
+            #expect(json.hasSuffix("\n"))
+        }
+
+        @Test func writeNoNewlineAtEndByDefault() throws {
+            let dict: NSDictionary = ["a": 1]
+            let data = try YYJSONSerialization.data(
+                withJSONObject: dict,
+                options: []
+            )
+            let json = String(data: data, encoding: .utf8)!
+            #expect(!json.hasSuffix("\n"))
+        }
+
+        @Test func writeNewlineAtEndWithPrettyPrinted() throws {
+            let dict: NSDictionary = ["a": 1]
+            let data = try YYJSONSerialization.data(
+                withJSONObject: dict,
+                options: [.prettyPrinted, .newlineAtEnd]
+            )
+            let json = String(data: data, encoding: .utf8)!
+            #expect(json.hasSuffix("\n"))
+            #expect(json.contains("    \"a\""))  // 4-space indent
+        }
     }
 
 #endif  // !YYJSON_DISABLE_WRITER
