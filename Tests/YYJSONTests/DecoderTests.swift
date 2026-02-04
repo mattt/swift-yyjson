@@ -836,9 +836,6 @@ import Testing
 
     @Suite("YYJSONDecoder - Numeric Type Coercion")
     struct DecoderNumericCoercionTests {
-        // Bug: JSON integer should be decodable as Swift Double
-        // https://github.com/user/swift-yyjson/issues/XXX
-
         @Test func decodeJSONIntegerAsDouble() throws {
             // JSON integer 1 should decode as Double 1.0
             let json = "1"
