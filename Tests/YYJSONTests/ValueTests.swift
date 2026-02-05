@@ -939,27 +939,27 @@ import Testing
         }
     }
 
-#if !YYJSON_DISABLE_WRITER
+    #if !YYJSON_DISABLE_WRITER
 
-    @Suite("YYJSONValue - Writing")
-    struct ValueWritingTests {
-        @Test func writeSortedKeys() throws {
-            let value = try YYJSONValue(string: #"{"b":1,"a":2}"#)
-            let data = try value.data(options: [.sortedKeys])
-            let json = String(data: data, encoding: .utf8)!
-            let aIndex = json.range(of: "\"a\"")!.lowerBound
-            let bIndex = json.range(of: "\"b\"")!.lowerBound
-            #expect(aIndex < bIndex)
+        @Suite("YYJSONValue - Writing")
+        struct ValueWritingTests {
+            @Test func writeSortedKeys() throws {
+                let value = try YYJSONValue(string: #"{"b":1,"a":2}"#)
+                let data = try value.data(options: [.sortedKeys])
+                let json = String(data: data, encoding: .utf8)!
+                let aIndex = json.range(of: "\"a\"")!.lowerBound
+                let bIndex = json.range(of: "\"b\"")!.lowerBound
+                #expect(aIndex < bIndex)
+            }
+
+            @Test func writeFragment() throws {
+                let value = try YYJSONValue(string: "true")
+                let data = try value.data()
+                let json = String(data: data, encoding: .utf8)!
+                #expect(json == "true")
+            }
         }
 
-        @Test func writeFragment() throws {
-            let value = try YYJSONValue(string: "true")
-            let data = try value.data()
-            let json = String(data: data, encoding: .utf8)!
-            #expect(json == "true")
-        }
-    }
-
-#endif  // !YYJSON_DISABLE_WRITER
+    #endif  // !YYJSON_DISABLE_WRITER
 
 #endif  // !YYJSON_DISABLE_READER
