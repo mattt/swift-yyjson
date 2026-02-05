@@ -261,7 +261,9 @@ public enum YYJSONSerialization {
             }
 
             var writeOptions: YYJSONWriteOptions = []
-            if options.contains(.prettyPrinted) {
+            if options.contains(.prettyPrintedTwoSpaces) {
+                writeOptions.insert(.prettyPrintedTwoSpaces)
+            } else if options.contains(.prettyPrinted) {
                 writeOptions.insert(.prettyPrinted)
             }
             if options.contains(.sortedKeys) {
@@ -269,6 +271,12 @@ public enum YYJSONSerialization {
             }
             if !options.contains(.withoutEscapingSlashes) {
                 writeOptions.insert(.escapeSlashes)
+            }
+            if options.contains(.escapeUnicode) {
+                writeOptions.insert(.escapeUnicode)
+            }
+            if options.contains(.newlineAtEnd) {
+                writeOptions.insert(.newlineAtEnd)
             }
 
             return try value.data(options: writeOptions)
