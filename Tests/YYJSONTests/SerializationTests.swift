@@ -202,6 +202,16 @@ import Testing
                 }
             }
 
+            @Test func writeYYJSONValueFragmentWithOption() throws {
+                let value = try YYJSONValue(string: "true")
+                let data = try YYJSONSerialization.data(
+                    withJSONObject: value,
+                    options: .fragmentsAllowed
+                )
+                let json = String(data: data, encoding: .utf8)!
+                #expect(json == "true")
+            }
+
             @Test func writeYYJSONValueSortedKeys() throws {
                 let value = try YYJSONValue(string: #"{"z":1,"a":{"b":1,"a":2}}"#)
                 let data = try YYJSONSerialization.data(
