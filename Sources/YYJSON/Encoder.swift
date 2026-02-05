@@ -68,7 +68,7 @@ import Foundation
             }
 
             if writeOptions.contains(.sortedKeys) {
-                try YYJSONValue.sortObjectKeys(root)
+                try sortObjectKeys(root)
             }
 
             yyjson_mut_doc_set_root(doc, root)
@@ -88,7 +88,6 @@ import Foundation
 
             return Data(bytes: jsonString, count: length)
         }
-
     }
 
     // MARK: - Encoding Strategies
