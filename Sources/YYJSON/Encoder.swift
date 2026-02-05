@@ -68,7 +68,7 @@ import Foundation
             }
 
             if writeOptions.contains(.sortedKeys) {
-                try sortObjectKeys(root)
+                try YYJSONValue.sortObjectKeys(root)
             }
 
             yyjson_mut_doc_set_root(doc, root)
