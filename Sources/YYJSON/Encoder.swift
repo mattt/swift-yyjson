@@ -135,7 +135,9 @@ import Foundation
                 }
             } else if yyjson_mut_is_arr(val) {
                 var iter = yyjson_mut_arr_iter()
-                yyjson_mut_arr_iter_init(val, &iter)
+                guard yyjson_mut_arr_iter_init(val, &iter) else {
+                    throw YYJSONError.invalidData("Failed to initialize array iterator during key sorting")
+                }
                 while let elem = yyjson_mut_arr_iter_next(&iter) {
                     try sortObjectKeys(elem)
                 }
