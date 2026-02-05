@@ -58,10 +58,11 @@ public enum YYJSONSerialization {
         /// This flag overrides `prettyPrinted` if both are set.
         public static let prettyPrintedTwoSpaces = WritingOptions(rawValue: 1 << 4)
 
-        /// Escape unicode characters as `\uXXXX`, making the output ASCII only.
+        /// Escape non-ASCII characters in string values as `\uXXXX`, making the output ASCII only.
+        /// Scalars outside the BMP are emitted as surrogate pairs.
         public static let escapeUnicode = WritingOptions(rawValue: 1 << 5)
 
-        /// Add a newline character `\n` at the end of the JSON.
+        /// Add a single newline character `\n` at the end of the JSON.
         public static let newlineAtEnd = WritingOptions(rawValue: 1 << 6)
     }
 
