@@ -163,6 +163,18 @@ import Testing
             #expect(json == "[1,2,3,4,5]")
         }
 
+        #if !YYJSON_DISABLE_READER
+
+            @Test func writeYYJSONValue() throws {
+                let value = try YYJSONValue(string: #"{"name":"Alice","age":30}"#)
+                let data = try YYJSONSerialization.data(withJSONObject: value)
+                let json = String(data: data, encoding: .utf8)!
+                #expect(json.contains("\"name\""))
+                #expect(json.contains("\"age\""))
+            }
+
+        #endif  // !YYJSON_DISABLE_READER
+
         @Test func writeNestedStructure() throws {
             let dict: NSDictionary = [
                 "users": [
