@@ -204,21 +204,53 @@ import Foundation
     /// For zero-allocation access in performance-critical code,
     /// use `.cString` to get the raw C string pointer.
     public struct YYJSONValue: @unchecked Sendable {
-        /// Internal storage for the value kind.
-        /// Strings are stored as pointers and converted lazily on access.
-        private enum Kind {
-            case null
-            case bool(Bool)
-            case number(Double)
-            case stringPtr(UnsafePointer<CChar>)
+        /// Backing storage for a parsed JSON value.
+        /// - Note: For non-null values, the `yyjson_val` pointer is guaranteed to be non-nil
+        ///   and valid for the lifetime of `document`.
+        private enum Storage {
+            /// Represents a JSON null value. The pointer is `nil` when initialized with a `nil` value.
+            case null(UnsafeMutablePointer<yyjson_val>?)
+            /// A JSON boolean with its underlying yyjson value pointer.
+            case bool(Bool, UnsafeMutablePointer<yyjson_val>)
+            /// A JSON integer stored as `Int64`, with its yyjson value pointer.
+            case numberInt(Int64, UnsafeMutablePointer<yyjson_val>)
+            /// A JSON floating-point number stored as `Double`, with its yyjson value pointer.
+            case numberDouble(Double, UnsafeMutablePointer<yyjson_val>)
+            /// A JSON string backed by a C string pointer and its yyjson value pointer.
+            case stringPtr(UnsafePointer<CChar>, UnsafeMutablePointer<yyjson_val>)
+            /// A JSON object value pointer.
             case object(UnsafeMutablePointer<yyjson_val>)
+            /// A JSON array value pointer.
             case array(UnsafeMutablePointer<yyjson_val>)
         }
 
-        private let kind: Kind
+        /// The backing storage for the JSON value.
+        private let storage: Storage
+
+        /// The raw yyjson value pointer (used for serialization and traversal).
+        /// - Note: The pointer is valid for the lifetime of `document`. It is `nil`
+        ///   only when this value was initialized with a `nil` pointer.
+        var rawValue: UnsafeMutablePointer<yyjson_val>? {
+            switch storage {
+            case .null(let ptr):
+                return ptr
+            case .bool(_, let ptr):
+                return ptr
+            case .numberInt(_, let ptr):
+                return ptr
+            case .numberDouble(_, let ptr):
+                return ptr
+            case .stringPtr(_, let ptr):
+                return ptr
+            case .object(let ptr):
+                return ptr
+            case .array(let ptr):
+                return ptr
+            }
+        }
 
         /// The document that owns this value (for lifetime management).
-        internal let document: YYDocument
+        let document: YYDocument
 
         /// Initializes from a yyjson value pointer.
         ///
@@ -229,41 +261,39 @@ import Foundation
             self.document = document
 
             guard let val = value else {
-                self.kind = .null
+                self.storage = .null(nil)
                 return
             }
 
             switch yyjson_get_type(val) {
             case YYJSON_TYPE_NULL:
-                self.kind = .null
+                self.storage = .null(val)
             case YYJSON_TYPE_BOOL:
-                self.kind = .bool(yyjson_get_bool(val))
+                self.storage = .bool(yyjson_get_bool(val), val)
             case YYJSON_TYPE_NUM:
-                let num: Double
                 if yyjson_is_int(val) {
-                    num = Double(yyjson_get_sint(val))
+                    self.storage = .numberInt(yyjson_get_sint(val), val)
                 } else {
-                    num = yyjson_get_real(val)
+                    self.storage = .numberDouble(yyjson_get_real(val), val)
                 }
-                self.kind = .number(num)
             case YYJSON_TYPE_STR:
                 if let str = yyjson_get_str(val) {
-                    self.kind = .stringPtr(str)
+                    self.storage = .stringPtr(str, val)
                 } else {
-                    self.kind = .null
+                    self.storage = .null(val)
                 }
             case YYJSON_TYPE_ARR:
-                self.kind = .array(val)
+                self.storage = .array(val)
             case YYJSON_TYPE_OBJ:
-                self.kind = .object(val)
+                self.storage = .object(val)
             default:
-                self.kind = .null
+                self.storage = .null(val)
             }
         }
 
         /// Whether this value is null.
         public var isNull: Bool {
-            if case .null = kind { return true }
+            if case .null = storage { return true }
             return false
         }
 
@@ -273,7 +303,7 @@ import Foundation
         /// - Returns: The value at the key,
         ///   or `nil` if not found or not an object.
         public subscript(key: String) -> YYJSONValue? {
-            guard case .object(let ptr) = kind else { return nil }
+            guard case .object(let ptr) = storage else { return nil }
             guard let val = yyObjGet(ptr, key: key) else { return nil }
             return YYJSONValue(value: val, document: document)
         }
@@ -284,7 +314,7 @@ import Foundation
         /// - Returns: The value at the index,
         ///   or `nil` if out of bounds or not an array.
         public subscript(index: Int) -> YYJSONValue? {
-            guard case .array(let ptr) = kind else { return nil }
+            guard case .array(let ptr) = storage else { return nil }
             guard let val = yyjson_arr_get(ptr, index) else { return nil }
             return YYJSONValue(value: val, document: document)
         }
@@ -295,7 +325,7 @@ import Foundation
         /// which involves a copy.
         /// For zero-allocation access in hot paths, use `.cString` instead.
         public var string: String? {
-            if case .stringPtr(let ptr) = kind {
+            if case .stringPtr(let ptr, _) = storage {
                 return String(cString: ptr)
             }
             return nil
@@ -309,45 +339,53 @@ import Foundation
         /// - Warning: Do not use this pointer after the `YYJSONValue`
         ///            or its originating document has been deallocated.
         public var cString: UnsafePointer<CChar>? {
-            if case .stringPtr(let ptr) = kind { return ptr }
+            if case .stringPtr(let ptr, _) = storage { return ptr }
             return nil
         }
 
         /// The number value, or `nil` if not a number.
         public var number: Double? {
-            if case .number(let num) = kind { return num }
-            return nil
+            switch storage {
+            case .numberInt(let value, _):
+                return Double(value)
+            case .numberDouble(let value, _):
+                return value
+            default:
+                return nil
+            }
         }
 
         /// The Boolean value, or `nil` if not a Boolean.
         public var bool: Bool? {
-            if case .bool(let b) = kind { return b }
+            if case .bool(let b, _) = storage { return b }
             return nil
         }
 
         /// The object value, or `nil` if not an object.
         public var object: YYJSONObject? {
-            guard case .object(let ptr) = kind else { return nil }
+            guard case .object(let ptr) = storage else { return nil }
             return YYJSONObject(value: ptr, document: document)
         }
 
         /// The array value, or `nil` if not an array.
         public var array: YYJSONArray? {
-            guard case .array(let ptr) = kind else { return nil }
+            guard case .array(let ptr) = storage else { return nil }
             return YYJSONArray(value: ptr, document: document)
         }
     }
 
     extension YYJSONValue: CustomStringConvertible {
         public var description: String {
-            switch kind {
+            switch storage {
             case .null:
                 return "null"
-            case .bool(let b):
+            case .bool(let b, _):
                 return b ? "true" : "false"
-            case .number(let n):
+            case .numberInt(let n, _):
                 return String(n)
-            case .stringPtr(let ptr):
+            case .numberDouble(let n, _):
+                return String(n)
+            case .stringPtr(let ptr, _):
                 return "\"\(String(cString: ptr))\""
             case .object(let ptr):
                 return YYJSONObject(value: ptr, document: document).description
@@ -584,5 +622,54 @@ import Foundation
             return YYJSONValue(value: root, document: document)
         }
     }
+
+    #if !YYJSON_DISABLE_WRITER
+
+        // MARK: - Writing
+
+        extension YYJSONValue {
+            /// Returns JSON data for this value.
+            /// - Parameter options: Options for writing JSON.
+            /// - Returns: The encoded JSON data.
+            /// - Throws: `YYJSONError` if writing fails.
+            public func data(options: YYJSONWriteOptions = .default) throws -> Data {
+                guard let rawValue = rawValue else {
+                    throw YYJSONError.invalidData("Value has no backing document")
+                }
+
+                var error = yyjson_write_err()
+                var length: size_t = 0
+                var jsonString: UnsafeMutablePointer<CChar>?
+
+                if options.contains(.sortedKeys) {
+                    guard let doc = yyjson_mut_doc_new(nil) else {
+                        throw YYJSONError.invalidData("Failed to create document")
+                    }
+                    defer {
+                        yyjson_mut_doc_free(doc)
+                    }
+
+                    guard let mutableValue = yyjson_val_mut_copy(doc, rawValue) else {
+                        throw YYJSONError.invalidData("Failed to copy value")
+                    }
+
+                    try sortObjectKeys(mutableValue)
+                    jsonString = yyjson_mut_val_write_opts(mutableValue, options.yyjsonFlags, nil, &length, &error)
+                } else {
+                    jsonString = yyjson_val_write_opts(rawValue, options.yyjsonFlags, nil, &length, &error)
+                }
+
+                guard let jsonString else {
+                    throw YYJSONError(writing: error)
+                }
+
+                defer {
+                    free(jsonString)
+                }
+
+                return Data(bytes: jsonString, count: length)
+            }
+        }
+    #endif  // !YYJSON_DISABLE_WRITER
 
 #endif  // !YYJSON_DISABLE_READER

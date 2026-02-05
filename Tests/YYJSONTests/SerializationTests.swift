@@ -163,6 +163,258 @@ import Testing
             #expect(json == "[1,2,3,4,5]")
         }
 
+        #if !YYJSON_DISABLE_READER
+
+            private static func jsonString(
+                for object: Any,
+                options: YYJSONSerialization.WritingOptions = []
+            ) throws -> String {
+                let data = try YYJSONSerialization.data(
+                    withJSONObject: object,
+                    options: options
+                )
+                return String(data: data, encoding: .utf8)!
+            }
+
+            @Test func writeYYJSONValue() throws {
+                let value = try YYJSONValue(string: #"{"name":"Alice","age":30}"#)
+                let data = try YYJSONSerialization.data(withJSONObject: value)
+                let json = String(data: data, encoding: .utf8)!
+                #expect(json.contains("\"name\""))
+                #expect(json.contains("\"age\""))
+            }
+
+            @Test func writeYYJSONObject() throws {
+                let value = try YYJSONValue(string: #"{"name":"Alice"}"#)
+                guard let object = value.object else {
+                    Issue.record("Expected object")
+                    return
+                }
+                let data = try YYJSONSerialization.data(withJSONObject: object)
+                let json = String(data: data, encoding: .utf8)!
+                #expect(json.contains("\"name\""))
+            }
+
+            @Test func writeYYJSONArray() throws {
+                let value = try YYJSONValue(string: "[1,2,3]")
+                guard let array = value.array else {
+                    Issue.record("Expected array")
+                    return
+                }
+                let data = try YYJSONSerialization.data(withJSONObject: array)
+                let json = String(data: data, encoding: .utf8)!
+                #expect(json == "[1,2,3]")
+            }
+
+            @Test func writeYYJSONValueFragmentWithoutOption() throws {
+                let value = try YYJSONValue(string: "true")
+                #expect(throws: YYJSONError.self) {
+                    _ = try YYJSONSerialization.data(withJSONObject: value)
+                }
+            }
+
+            @Test func writeYYJSONValueFragmentWithOption() throws {
+                let value = try YYJSONValue(string: "true")
+                let data = try YYJSONSerialization.data(
+                    withJSONObject: value,
+                    options: .fragmentsAllowed
+                )
+                let json = String(data: data, encoding: .utf8)!
+                #expect(json == "true")
+            }
+
+            @Test func writeYYJSONValueSortedKeys() throws {
+                let value = try YYJSONValue(string: #"{"z":1,"a":{"b":1,"a":2}}"#)
+                let data = try YYJSONSerialization.data(
+                    withJSONObject: value,
+                    options: .sortedKeys
+                )
+                let json = String(data: data, encoding: .utf8)!
+                let outerA = json.range(of: "\"a\"")!.lowerBound
+                let outerZ = json.range(of: "\"z\"")!.lowerBound
+                #expect(outerA < outerZ)
+                let innerA = json.range(of: "\"a\":2")!.lowerBound
+                let innerB = json.range(of: "\"b\":1")!.lowerBound
+                #expect(innerA < innerB)
+            }
+
+            @Test func writeYYJSONValuePrettyPrinted() throws {
+                let value = try YYJSONValue(string: #"{"key":"value"}"#)
+                let data = try YYJSONSerialization.data(
+                    withJSONObject: value,
+                    options: .prettyPrinted
+                )
+                let json = String(data: data, encoding: .utf8)!
+                #expect(json.contains("\n"))
+            }
+
+            @Test func writeYYJSONValuePrettyPrintedTwoSpaces() throws {
+                let value = try YYJSONValue(string: #"{"key":"value"}"#)
+                let json = try Self.jsonString(
+                    for: value,
+                    options: [.prettyPrintedTwoSpaces]
+                )
+                #expect(json.contains("  \"key\""))
+                #expect(!json.contains("    \"key\""))
+            }
+
+            @Test func writeYYJSONObjectPrettyPrintedTwoSpaces() throws {
+                let value = try YYJSONValue(string: #"{"key":"value"}"#)
+                guard let object = value.object else {
+                    Issue.record("Expected object")
+                    return
+                }
+                let json = try Self.jsonString(
+                    for: object,
+                    options: [.prettyPrintedTwoSpaces]
+                )
+                #expect(json.contains("  \"key\""))
+                #expect(!json.contains("    \"key\""))
+            }
+
+            @Test func writeYYJSONArrayPrettyPrintedTwoSpaces() throws {
+                let value = try YYJSONValue(string: #"[{"key":"value"}]"#)
+                guard let array = value.array else {
+                    Issue.record("Expected array")
+                    return
+                }
+                let json = try Self.jsonString(
+                    for: array,
+                    options: [.prettyPrintedTwoSpaces]
+                )
+                #expect(json.contains("\n  {"))
+                #expect(!json.contains("\n    {"))
+            }
+
+            @Test func writeYYJSONValuePrettyPrintedTwoSpacesOverridesPrettyPrinted() throws {
+                let value = try YYJSONValue(string: #"{"key":"value"}"#)
+                let json = try Self.jsonString(
+                    for: value,
+                    options: [.prettyPrinted, .prettyPrintedTwoSpaces]
+                )
+                #expect(json.contains("  \"key\""))
+                #expect(!json.contains("    \"key\""))
+            }
+
+            @Test func writeYYJSONValueEscapeUnicode() throws {
+                let value = try YYJSONValue(string: #"{"emoji":"🎉"}"#)
+                let json = try Self.jsonString(
+                    for: value,
+                    options: [.escapeUnicode]
+                )
+                #expect(!json.contains("🎉"))
+                #expect(json.contains("\\u"))
+            }
+
+            @Test func writeYYJSONObjectEscapeUnicode() throws {
+                let value = try YYJSONValue(string: #"{"emoji":"🎉"}"#)
+                guard let object = value.object else {
+                    Issue.record("Expected object")
+                    return
+                }
+                let json = try Self.jsonString(
+                    for: object,
+                    options: [.escapeUnicode]
+                )
+                #expect(!json.contains("🎉"))
+                #expect(json.contains("\\u"))
+            }
+
+            @Test func writeYYJSONArrayEscapeUnicode() throws {
+                let value = try YYJSONValue(string: #"["🎉"]"#)
+                guard let array = value.array else {
+                    Issue.record("Expected array")
+                    return
+                }
+                let json = try Self.jsonString(
+                    for: array,
+                    options: [.escapeUnicode]
+                )
+                #expect(!json.contains("🎉"))
+                #expect(json.contains("\\u"))
+            }
+
+            @Test func writeYYJSONValueNewlineAtEnd() throws {
+                let value = try YYJSONValue(string: #"{"key":"value"}"#)
+                let json = try Self.jsonString(
+                    for: value,
+                    options: [.newlineAtEnd]
+                )
+                #expect(json.hasSuffix("\n"))
+            }
+
+            @Test func writeYYJSONObjectNewlineAtEnd() throws {
+                let value = try YYJSONValue(string: #"{"key":"value"}"#)
+                guard let object = value.object else {
+                    Issue.record("Expected object")
+                    return
+                }
+                let json = try Self.jsonString(
+                    for: object,
+                    options: [.newlineAtEnd]
+                )
+                #expect(json.hasSuffix("\n"))
+            }
+
+            @Test func writeYYJSONArrayNewlineAtEnd() throws {
+                let value = try YYJSONValue(string: #"[1,2,3]"#)
+                guard let array = value.array else {
+                    Issue.record("Expected array")
+                    return
+                }
+                let json = try Self.jsonString(
+                    for: array,
+                    options: [.newlineAtEnd]
+                )
+                #expect(json.hasSuffix("\n"))
+            }
+
+            @Test func writeYYJSONValuePrettyPrintedTwoSpacesSortedKeys() throws {
+                let value = try YYJSONValue(string: #"{"b":2,"a":1}"#)
+                let json = try Self.jsonString(
+                    for: value,
+                    options: [.prettyPrintedTwoSpaces, .sortedKeys]
+                )
+                let aIndex = json.range(of: "\"a\"")!.lowerBound
+                let bIndex = json.range(of: "\"b\"")!.lowerBound
+                #expect(aIndex < bIndex)
+                #expect(json.contains("  \"a\""))
+            }
+
+            @Test func writeYYJSONObjectPrettyPrintedTwoSpacesSortedKeys() throws {
+                let value = try YYJSONValue(string: #"{"b":2,"a":1}"#)
+                guard let object = value.object else {
+                    Issue.record("Expected object")
+                    return
+                }
+                let json = try Self.jsonString(
+                    for: object,
+                    options: [.prettyPrintedTwoSpaces, .sortedKeys]
+                )
+                let aIndex = json.range(of: "\"a\"")!.lowerBound
+                let bIndex = json.range(of: "\"b\"")!.lowerBound
+                #expect(aIndex < bIndex)
+                #expect(json.contains("  \"a\""))
+            }
+
+            @Test func writeYYJSONArrayPrettyPrintedTwoSpacesSortedKeys() throws {
+                let value = try YYJSONValue(string: #"[{"b":2,"a":1}]"#)
+                guard let array = value.array else {
+                    Issue.record("Expected array")
+                    return
+                }
+                let json = try Self.jsonString(
+                    for: array,
+                    options: [.prettyPrintedTwoSpaces, .sortedKeys]
+                )
+                let aIndex = json.range(of: "\"a\"")!.lowerBound
+                let bIndex = json.range(of: "\"b\"")!.lowerBound
+                #expect(aIndex < bIndex)
+                #expect(json.contains("\n  {"))
+            }
+
+        #endif  // !YYJSON_DISABLE_READER
+
         @Test func writeNestedStructure() throws {
             let dict: NSDictionary = [
                 "users": [
