@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Cache Swift Package Manager dependencies
         uses: actions/cache@v4
@@ -65,7 +65,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Cache Swift Package Manager dependencies
         uses: actions/cache@v4
@@ -76,6 +76,58 @@ jobs:
           key: ${{ runner.os }}-swift-6.1-spm-${{ hashFiles('**/Package.resolved') }}-${{ matrix.trait }}
           restore-keys: |
             ${{ runner.os }}-swift-6.1-spm-
+
+      - name: Test
+        run: swift test --traits ${{ matrix.trait }}
+
+  test-linux:
+    name: Swift ${{ matrix.swift-version }} on Linux
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        swift-version:
+          - "6.1"
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Swift
+        uses: vapor/swiftly-action@v0.2
+        with:
+          toolchain: ${{ matrix.swift-version }}
+
+      - name: Lint
+        run: swift format lint --strict --recursive .
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
+
+  test-linux-traits:
+    name: Linux with trait ${{ matrix.trait }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        trait:
+          - "noReader"
+          - "noWriter"
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Swift
+        uses: vapor/swiftly-action@v0.2
+        with:
+          toolchain: "6.1"
+
+      - name: Build
+        run: swift build --traits ${{ matrix.trait }}
 
       - name: Test
         run: swift test --traits ${{ matrix.trait }}
