@@ -107,8 +107,16 @@ public struct YYJSONWriteOptions: OptionSet, Sendable {
     /// Add a newline character at the end of the JSON.
     public static let newlineAtEnd = YYJSONWriteOptions(rawValue: YYJSON_WRITE_NEWLINE_AT_END)
 
-    /// Convert to yyjson write flags.
+    /// Sort object keys lexicographically (UTF-8 byte order).
+    /// This flag is handled at Swift level since yyjson C library doesn't support key sorting.
+    public static let sortedKeys = YYJSONWriteOptions(rawValue: 1 << 16)
+
+    // Mask for Swift-only flags (bits 16+) that should not be passed to yyjson C library
+    private static let swiftOnlyFlagsMask: UInt32 = 0xFFFF_0000
+
+    /// Convert to yyjson write flags, excluding Swift-only flags.
     internal var yyjsonFlags: yyjson_write_flag {
-        yyjson_write_flag(rawValue)
+        // Only pass bits 0-15 to yyjson C library; bits 16+ are Swift-only flags
+        yyjson_write_flag(rawValue & ~YYJSONWriteOptions.swiftOnlyFlagsMask)
     }
 }

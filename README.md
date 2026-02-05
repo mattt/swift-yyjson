@@ -344,6 +344,7 @@ Available options:
 - `.escapeSlashes` — Escape `/` as `\/`
 - `.allowInvalidUnicode` — Allow invalid unicode when encoding
 - `.newlineAtEnd` — Add trailing newline
+- `.sortedKeys` — Sort object keys lexicographically (UTF-8 byte order)
 
 Non-standard options (unavailable when `strictStandardJSON` trait is enabled):
 
