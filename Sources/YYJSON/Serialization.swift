@@ -42,7 +42,7 @@ public enum YYJSONSerialization {
             self.rawValue = rawValue
         }
 
-        /// Specifies that the parser should allow top-level objects that aren't arrays or dictionaries.
+        /// Specifies that the writer should allow top-level values that aren't arrays or dictionaries.
         public static let fragmentsAllowed = WritingOptions(rawValue: 1 << 0)
 
         /// Specifies that the output uses white space and indentation to make the resulting data more readable.
@@ -53,6 +53,17 @@ public enum YYJSONSerialization {
 
         /// Specifies that the output doesn't prefix slash characters with escape characters.
         public static let withoutEscapingSlashes = WritingOptions(rawValue: 1 << 3)
+
+        /// Specifies that the output uses white space and 2-space indentation.
+        /// This flag overrides `prettyPrinted` if both are set.
+        public static let prettyPrintedTwoSpaces = WritingOptions(rawValue: 1 << 4)
+
+        /// Escape non-ASCII characters in string values as `\uXXXX`, making the output ASCII only.
+        /// Scalars outside the BMP are emitted as surrogate pairs.
+        public static let escapeUnicode = WritingOptions(rawValue: 1 << 5)
+
+        /// Add a single newline character `\n` at the end of the JSON.
+        public static let newlineAtEnd = WritingOptions(rawValue: 1 << 6)
     }
 
     /// Returns a Foundation object from given JSON data.
@@ -124,11 +135,25 @@ public enum YYJSONSerialization {
             yyjson_mut_doc_set_root(doc, root)
 
             var flags: yyjson_write_flag = 0
-            if options.contains(.prettyPrinted) {
+
+            // Pretty printing: 2-space overrides 4-space
+            if options.contains(.prettyPrintedTwoSpaces) {
+                flags |= YYJSON_WRITE_PRETTY_TWO_SPACES
+            } else if options.contains(.prettyPrinted) {
                 flags |= YYJSON_WRITE_PRETTY
             }
+
+            // Escaping options
             if !options.contains(.withoutEscapingSlashes) {
                 flags |= YYJSON_WRITE_ESCAPE_SLASHES
+            }
+            if options.contains(.escapeUnicode) {
+                flags |= YYJSON_WRITE_ESCAPE_UNICODE
+            }
+
+            // Formatting options
+            if options.contains(.newlineAtEnd) {
+                flags |= YYJSON_WRITE_NEWLINE_AT_END
             }
 
             var error = yyjson_write_err()
