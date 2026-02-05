@@ -5,6 +5,25 @@ import Testing
 
 #if !YYJSON_DISABLE_WRITER && !YYJSON_DISABLE_READER
 
+    /// A CodingKey that can be initialized with any string value.
+    /// Used for testing dynamic key encoding.
+    struct StringCodingKey: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+
+        init(_ string: String) {
+            self.stringValue = string
+        }
+
+        init?(stringValue: String) {
+            self.stringValue = stringValue
+        }
+
+        init?(intValue: Int) {
+            nil
+        }
+    }
+
     // MARK: - Basic Type Encoding Tests
 
     @Suite("YYJSONEncoder - Basic Types")
@@ -438,6 +457,199 @@ import Testing
             let data = try encoder.encode("你好")
             let result = String(data: data, encoding: .utf8)!
             #expect(result.contains("\\u"))
+        }
+
+        // MARK: - sortedKeys
+
+        @Test func encodeSortedKeys() throws {
+            struct Unordered: Encodable {
+                let z: Int
+                let a: Int
+                let m: Int
+            }
+
+            var encoder = YYJSONEncoder()
+            encoder.writeOptions = [.sortedKeys]
+            let data = try encoder.encode(Unordered(z: 3, a: 1, m: 2))
+            let json = String(data: data, encoding: .utf8)!
+
+            let aIndex = json.range(of: "\"a\"")!.lowerBound
+            let mIndex = json.range(of: "\"m\"")!.lowerBound
+            let zIndex = json.range(of: "\"z\"")!.lowerBound
+            #expect(aIndex < mIndex)
+            #expect(mIndex < zIndex)
+        }
+
+        @Test func encodeSortedKeysNested() throws {
+            struct Outer: Encodable {
+                let z: Inner
+                let a: Inner
+            }
+            struct Inner: Encodable {
+                let b: Int
+                let a: Int
+            }
+
+            var encoder = YYJSONEncoder()
+            encoder.writeOptions = [.sortedKeys]
+            let data = try encoder.encode(Outer(z: Inner(b: 2, a: 1), a: Inner(b: 4, a: 3)))
+            let json = String(data: data, encoding: .utf8)!
+
+            // Outer keys sorted
+            let outerA = json.range(of: "\"a\":{")!.lowerBound
+            let outerZ = json.range(of: "\"z\":{")!.lowerBound
+            #expect(outerA < outerZ)
+        }
+
+        @Test func encodeSortedKeysPrettyTwoSpaces() throws {
+            struct Item: Encodable {
+                let b: Int
+                let a: Int
+            }
+
+            var encoder = YYJSONEncoder()
+            encoder.writeOptions = [.prettyPrintedTwoSpaces, .sortedKeys]
+            let data = try encoder.encode(Item(b: 2, a: 1))
+            let json = String(data: data, encoding: .utf8)!
+
+            #expect(json.contains("  \"a\""))  // 2-space indent
+            let aIndex = json.range(of: "\"a\"")!.lowerBound
+            let bIndex = json.range(of: "\"b\"")!.lowerBound
+            #expect(aIndex < bIndex)  // sorted
+        }
+
+        @Test func encodeSortedKeysArray() throws {
+            struct Container: Encodable {
+                let items: [Item]
+            }
+            struct Item: Encodable {
+                let z: Int
+                let a: Int
+            }
+
+            var encoder = YYJSONEncoder()
+            encoder.writeOptions = [.sortedKeys]
+            let data = try encoder.encode(Container(items: [Item(z: 1, a: 2)]))
+            let json = String(data: data, encoding: .utf8)!
+
+            // Keys in array elements should also be sorted
+            #expect(json.contains("\"a\":2"))
+        }
+
+        @Test func encodeSortedKeysEmpty() throws {
+            struct Empty: Encodable {}
+
+            var encoder = YYJSONEncoder()
+            encoder.writeOptions = [.sortedKeys]
+            let data = try encoder.encode(Empty())
+            let json = String(data: data, encoding: .utf8)!
+            #expect(json == "{}")
+        }
+
+        @Test func encodeSortedKeysNumericStrings() throws {
+            // Numeric-like keys should sort lexicographically, not numerically
+            // UTF-8 order: "1" < "10" < "2" (not "1" < "2" < "10")
+            struct NumericKeys: Encodable {
+                func encode(to encoder: Encoder) throws {
+                    var container = encoder.container(keyedBy: StringCodingKey.self)
+                    try container.encode(1, forKey: StringCodingKey("10"))
+                    try container.encode(2, forKey: StringCodingKey("2"))
+                    try container.encode(3, forKey: StringCodingKey("1"))
+                }
+            }
+
+            var encoder = YYJSONEncoder()
+            encoder.writeOptions = [.sortedKeys]
+            let data = try encoder.encode(NumericKeys())
+            let json = String(data: data, encoding: .utf8)!
+
+            #expect(json == #"{"1":3,"10":1,"2":2}"#)
+        }
+
+        @Test func encodeSortedKeysCaseSensitive() throws {
+            // UTF-8 order: 'A' (0x41) < 'B' (0x42) < 'a' (0x61) < 'b' (0x62)
+            struct CaseKeys: Encodable {
+                let a = 1
+                let A = 2
+                let b = 3
+                let B = 4
+            }
+
+            var encoder = YYJSONEncoder()
+            encoder.writeOptions = [.sortedKeys]
+            let data = try encoder.encode(CaseKeys())
+            let json = String(data: data, encoding: .utf8)!
+
+            #expect(json == #"{"A":2,"B":4,"a":1,"b":3}"#)
+        }
+
+        @Test func encodeSortedKeysUnicode() throws {
+            // ASCII characters come before multi-byte UTF-8
+            struct UnicodeKeys: Encodable {
+                func encode(to encoder: Encoder) throws {
+                    var container = encoder.container(keyedBy: StringCodingKey.self)
+                    try container.encode(1, forKey: StringCodingKey("apple"))
+                    try container.encode(2, forKey: StringCodingKey("中文"))
+                    try container.encode(3, forKey: StringCodingKey("banana"))
+                }
+            }
+
+            var encoder = YYJSONEncoder()
+            encoder.writeOptions = [.sortedKeys]
+            let data = try encoder.encode(UnicodeKeys())
+            let json = String(data: data, encoding: .utf8)!
+
+            // "apple" < "banana" < "中文" (UTF-8 byte order)
+            let appleIdx = json.range(of: "\"apple\"")!.lowerBound
+            let bananaIdx = json.range(of: "\"banana\"")!.lowerBound
+            let chineseIdx = json.range(of: "\"中文\"")!.lowerBound
+
+            #expect(appleIdx < bananaIdx)
+            #expect(bananaIdx < chineseIdx)
+        }
+
+        @Test func encodeSortedKeysMatchesFoundation() throws {
+            // Verify output matches Apple's JSONEncoder with sortedKeys
+            struct Sample: Encodable {
+                let zebra = 1
+                let apple = 2
+                let mango = 3
+                let nested = Nested()
+                struct Nested: Encodable {
+                    let b = 1
+                    let a = 2
+                }
+            }
+
+            var yyEncoder = YYJSONEncoder()
+            yyEncoder.writeOptions = [.sortedKeys]
+            let yyData = try yyEncoder.encode(Sample())
+
+            let foundationEncoder = JSONEncoder()
+            foundationEncoder.outputFormatting = .sortedKeys
+            let foundationData = try foundationEncoder.encode(Sample())
+
+            #expect(yyData == foundationData)
+        }
+
+        @Test func encodeSortedKeysWithNullValues() throws {
+            // Explicitly encode nil values using custom encode
+            struct WithNulls: Encodable {
+                func encode(to encoder: Encoder) throws {
+                    var container = encoder.container(keyedBy: StringCodingKey.self)
+                    try container.encode("value", forKey: StringCodingKey("z"))
+                    try container.encodeNil(forKey: StringCodingKey("a"))
+                    try container.encode(42, forKey: StringCodingKey("m"))
+                }
+            }
+
+            var encoder = YYJSONEncoder()
+            encoder.writeOptions = [.sortedKeys]
+            let data = try encoder.encode(WithNulls())
+            let json = String(data: data, encoding: .utf8)!
+
+            // Keys should still be sorted even with null values
+            #expect(json == #"{"a":null,"m":42,"z":"value"}"#)
         }
     }
 
