@@ -173,6 +173,60 @@ import Testing
                 #expect(json.contains("\"age\""))
             }
 
+            @Test func writeYYJSONObject() throws {
+                let value = try YYJSONValue(string: #"{"name":"Alice"}"#)
+                guard let object = value.object else {
+                    Issue.record("Expected object")
+                    return
+                }
+                let data = try YYJSONSerialization.data(withJSONObject: object)
+                let json = String(data: data, encoding: .utf8)!
+                #expect(json.contains("\"name\""))
+            }
+
+            @Test func writeYYJSONArray() throws {
+                let value = try YYJSONValue(string: "[1,2,3]")
+                guard let array = value.array else {
+                    Issue.record("Expected array")
+                    return
+                }
+                let data = try YYJSONSerialization.data(withJSONObject: array)
+                let json = String(data: data, encoding: .utf8)!
+                #expect(json == "[1,2,3]")
+            }
+
+            @Test func writeYYJSONValueFragmentWithoutOption() throws {
+                let value = try YYJSONValue(string: "true")
+                #expect(throws: YYJSONError.self) {
+                    _ = try YYJSONSerialization.data(withJSONObject: value)
+                }
+            }
+
+            @Test func writeYYJSONValueSortedKeys() throws {
+                let value = try YYJSONValue(string: #"{"z":1,"a":{"b":1,"a":2}}"#)
+                let data = try YYJSONSerialization.data(
+                    withJSONObject: value,
+                    options: .sortedKeys
+                )
+                let json = String(data: data, encoding: .utf8)!
+                let outerA = json.range(of: "\"a\"")!.lowerBound
+                let outerZ = json.range(of: "\"z\"")!.lowerBound
+                #expect(outerA < outerZ)
+                let innerA = json.range(of: "\"a\":2")!.lowerBound
+                let innerB = json.range(of: "\"b\":1")!.lowerBound
+                #expect(innerA < innerB)
+            }
+
+            @Test func writeYYJSONValuePrettyPrinted() throws {
+                let value = try YYJSONValue(string: #"{"key":"value"}"#)
+                let data = try YYJSONSerialization.data(
+                    withJSONObject: value,
+                    options: .prettyPrinted
+                )
+                let json = String(data: data, encoding: .utf8)!
+                #expect(json.contains("\n"))
+            }
+
         #endif  // !YYJSON_DISABLE_READER
 
         @Test func writeNestedStructure() throws {

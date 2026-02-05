@@ -207,19 +207,38 @@ import Foundation
         /// Internal storage for the value kind.
         /// Strings are stored as pointers and converted lazily on access.
         private enum Kind {
-            case null
-            case bool(Bool)
-            case numberInt(Int64)
-            case numberDouble(Double)
-            case stringPtr(UnsafePointer<CChar>)
-            case object
-            case array
+            case null(UnsafeMutablePointer<yyjson_val>?)
+            case bool(Bool, UnsafeMutablePointer<yyjson_val>)
+            case numberInt(Int64, UnsafeMutablePointer<yyjson_val>)
+            case numberDouble(Double, UnsafeMutablePointer<yyjson_val>)
+            case stringPtr(UnsafePointer<CChar>, UnsafeMutablePointer<yyjson_val>)
+            case object(UnsafeMutablePointer<yyjson_val>)
+            case array(UnsafeMutablePointer<yyjson_val>)
         }
 
         private let kind: Kind
 
-        /// The raw yyjson value pointer (for serialization).
-        let rawValue: UnsafeMutablePointer<yyjson_val>?
+        /// The raw yyjson value pointer (used for serialization and traversal).
+        /// - Note: The pointer is valid for the lifetime of `document`. It is `nil`
+        ///   only when this value was initialized with a `nil` pointer.
+        var rawValue: UnsafeMutablePointer<yyjson_val>? {
+            switch kind {
+            case .null(let ptr):
+                return ptr
+            case .bool(_, let ptr):
+                return ptr
+            case .numberInt(_, let ptr):
+                return ptr
+            case .numberDouble(_, let ptr):
+                return ptr
+            case .stringPtr(_, let ptr):
+                return ptr
+            case .object(let ptr):
+                return ptr
+            case .array(let ptr):
+                return ptr
+            }
+        }
 
         /// The document that owns this value (for lifetime management).
         let document: YYDocument
@@ -231,36 +250,35 @@ import Foundation
         ///   - document: The document that owns this value (for lifetime management).
         init(value: UnsafeMutablePointer<yyjson_val>?, document: YYDocument) {
             self.document = document
-            self.rawValue = value
 
             guard let val = value else {
-                self.kind = .null
+                self.kind = .null(nil)
                 return
             }
 
             switch yyjson_get_type(val) {
             case YYJSON_TYPE_NULL:
-                self.kind = .null
+                self.kind = .null(val)
             case YYJSON_TYPE_BOOL:
-                self.kind = .bool(yyjson_get_bool(val))
+                self.kind = .bool(yyjson_get_bool(val), val)
             case YYJSON_TYPE_NUM:
                 if yyjson_is_int(val) {
-                    self.kind = .numberInt(yyjson_get_sint(val))
+                    self.kind = .numberInt(yyjson_get_sint(val), val)
                 } else {
-                    self.kind = .numberDouble(yyjson_get_real(val))
+                    self.kind = .numberDouble(yyjson_get_real(val), val)
                 }
             case YYJSON_TYPE_STR:
                 if let str = yyjson_get_str(val) {
-                    self.kind = .stringPtr(str)
+                    self.kind = .stringPtr(str, val)
                 } else {
-                    self.kind = .null
+                    self.kind = .null(val)
                 }
             case YYJSON_TYPE_ARR:
-                self.kind = .array
+                self.kind = .array(val)
             case YYJSON_TYPE_OBJ:
-                self.kind = .object
+                self.kind = .object(val)
             default:
-                self.kind = .null
+                self.kind = .null(val)
             }
         }
 
@@ -276,8 +294,8 @@ import Foundation
         /// - Returns: The value at the key,
         ///   or `nil` if not found or not an object.
         public subscript(key: String) -> YYJSONValue? {
-            guard case .object = kind, let rawValue else { return nil }
-            guard let val = yyObjGet(rawValue, key: key) else { return nil }
+            guard case .object(let ptr) = kind else { return nil }
+            guard let val = yyObjGet(ptr, key: key) else { return nil }
             return YYJSONValue(value: val, document: document)
         }
 
@@ -287,8 +305,8 @@ import Foundation
         /// - Returns: The value at the index,
         ///   or `nil` if out of bounds or not an array.
         public subscript(index: Int) -> YYJSONValue? {
-            guard case .array = kind, let rawValue else { return nil }
-            guard let val = yyjson_arr_get(rawValue, index) else { return nil }
+            guard case .array(let ptr) = kind else { return nil }
+            guard let val = yyjson_arr_get(ptr, index) else { return nil }
             return YYJSONValue(value: val, document: document)
         }
 
@@ -298,7 +316,7 @@ import Foundation
         /// which involves a copy.
         /// For zero-allocation access in hot paths, use `.cString` instead.
         public var string: String? {
-            if case .stringPtr(let ptr) = kind {
+            if case .stringPtr(let ptr, _) = kind {
                 return String(cString: ptr)
             }
             return nil
@@ -312,16 +330,16 @@ import Foundation
         /// - Warning: Do not use this pointer after the `YYJSONValue`
         ///            or its originating document has been deallocated.
         public var cString: UnsafePointer<CChar>? {
-            if case .stringPtr(let ptr) = kind { return ptr }
+            if case .stringPtr(let ptr, _) = kind { return ptr }
             return nil
         }
 
         /// The number value, or `nil` if not a number.
         public var number: Double? {
             switch kind {
-            case .numberInt(let value):
+            case .numberInt(let value, _):
                 return Double(value)
-            case .numberDouble(let value):
+            case .numberDouble(let value, _):
                 return value
             default:
                 return nil
@@ -330,20 +348,20 @@ import Foundation
 
         /// The Boolean value, or `nil` if not a Boolean.
         public var bool: Bool? {
-            if case .bool(let b) = kind { return b }
+            if case .bool(let b, _) = kind { return b }
             return nil
         }
 
         /// The object value, or `nil` if not an object.
         public var object: YYJSONObject? {
-            guard case .object = kind, let rawValue else { return nil }
-            return YYJSONObject(value: rawValue, document: document)
+            guard case .object(let ptr) = kind else { return nil }
+            return YYJSONObject(value: ptr, document: document)
         }
 
         /// The array value, or `nil` if not an array.
         public var array: YYJSONArray? {
-            guard case .array = kind, let rawValue else { return nil }
-            return YYJSONArray(value: rawValue, document: document)
+            guard case .array(let ptr) = kind else { return nil }
+            return YYJSONArray(value: ptr, document: document)
         }
     }
 
@@ -352,20 +370,18 @@ import Foundation
             switch kind {
             case .null:
                 return "null"
-            case .bool(let b):
+            case .bool(let b, _):
                 return b ? "true" : "false"
-            case .numberInt(let n):
-                return String(Double(n))
-            case .numberDouble(let n):
+            case .numberInt(let n, _):
                 return String(n)
-            case .stringPtr(let ptr):
+            case .numberDouble(let n, _):
+                return String(n)
+            case .stringPtr(let ptr, _):
                 return "\"\(String(cString: ptr))\""
-            case .object:
-                guard let rawValue else { return "null" }
-                return YYJSONObject(value: rawValue, document: document).description
-            case .array:
-                guard let rawValue else { return "null" }
-                return YYJSONArray(value: rawValue, document: document).description
+            case .object(let ptr):
+                return YYJSONObject(value: ptr, document: document).description
+            case .array(let ptr):
+                return YYJSONArray(value: ptr, document: document).description
             }
         }
     }
