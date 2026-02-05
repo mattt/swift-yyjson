@@ -90,7 +90,8 @@ import Foundation
         }
 
         /// Recursively sort object keys in-place using UTF-8 lexicographical comparison (strcmp).
-        /// This matches Apple's JSONEncoder behavior.
+        /// This matches Apple's JSONEncoder behavior for typical keys, but embedded null bytes
+        /// may compare differently due to C string semantics.
         ///
         /// - Note: Uses direct C string comparison via `strcmp` for optimal performance,
         ///   avoiding Swift String allocations during sorting.
@@ -98,7 +99,7 @@ import Foundation
             typealias MutVal = UnsafeMutablePointer<yyjson_mut_val>
 
             if yyjson_mut_is_obj(val) {
-                var pairs: [(keyVal: MutVal, val: MutVal)] = []
+                var pairs: [(keyVal: MutVal, val: MutVal, keyStr: UnsafePointer<CChar>)] = []
                 pairs.reserveCapacity(Int(yyjson_mut_obj_size(val)))
 
                 var iter = yyjson_mut_obj_iter()
@@ -110,17 +111,15 @@ import Foundation
                     guard let valPtr = yyjson_mut_obj_iter_get_val(keyPtr) else {
                         throw YYJSONError.invalidData("Object key has no associated value during key sorting")
                     }
-                    guard yyjson_mut_get_str(keyPtr) != nil else {
+                    guard let keyStr = yyjson_mut_get_str(keyPtr) else {
                         throw YYJSONError.invalidData("Object key is not a string during key sorting")
                     }
-                    pairs.append((keyPtr, valPtr))
+                    pairs.append((keyPtr, valPtr, keyStr))
                 }
 
-                // Sort using strcmp for UTF-8 lexicographical comparison (same as Apple's JSONEncoder)
+                // Sort using strcmp for UTF-8 lexicographical comparison (same as Apple's JSONEncoder for typical keys).
                 pairs.sort { pair1, pair2 in
-                    let str1 = yyjson_mut_get_str(pair1.keyVal)!
-                    let str2 = yyjson_mut_get_str(pair2.keyVal)!
-                    return strcmp(str1, str2) < 0
+                    return strcmp(pair1.keyStr, pair2.keyStr) < 0
                 }
 
                 guard yyjson_mut_obj_clear(val) else {
