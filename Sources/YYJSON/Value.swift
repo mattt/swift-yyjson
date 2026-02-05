@@ -204,25 +204,34 @@ import Foundation
     /// For zero-allocation access in performance-critical code,
     /// use `.cString` to get the raw C string pointer.
     public struct YYJSONValue: @unchecked Sendable {
-        /// Internal storage for the value kind.
-        /// Strings are stored as pointers and converted lazily on access.
-        private enum Kind {
+        /// Backing storage for a parsed JSON value.
+        /// - Note: For non-null values, the `yyjson_val` pointer is guaranteed to be non-nil
+        ///   and valid for the lifetime of `document`.
+        private enum Storage {
+            /// Represents a JSON null value. The pointer is `nil` when initialized with a `nil` value.
             case null(UnsafeMutablePointer<yyjson_val>?)
+            /// A JSON boolean with its underlying yyjson value pointer.
             case bool(Bool, UnsafeMutablePointer<yyjson_val>)
+            /// A JSON integer stored as `Int64`, with its yyjson value pointer.
             case numberInt(Int64, UnsafeMutablePointer<yyjson_val>)
+            /// A JSON floating-point number stored as `Double`, with its yyjson value pointer.
             case numberDouble(Double, UnsafeMutablePointer<yyjson_val>)
+            /// A JSON string backed by a C string pointer and its yyjson value pointer.
             case stringPtr(UnsafePointer<CChar>, UnsafeMutablePointer<yyjson_val>)
+            /// A JSON object value pointer.
             case object(UnsafeMutablePointer<yyjson_val>)
+            /// A JSON array value pointer.
             case array(UnsafeMutablePointer<yyjson_val>)
         }
 
-        private let kind: Kind
+        /// The backing storage for the JSON value.
+        private let storage: Storage
 
         /// The raw yyjson value pointer (used for serialization and traversal).
         /// - Note: The pointer is valid for the lifetime of `document`. It is `nil`
         ///   only when this value was initialized with a `nil` pointer.
         var rawValue: UnsafeMutablePointer<yyjson_val>? {
-            switch kind {
+            switch storage {
             case .null(let ptr):
                 return ptr
             case .bool(_, let ptr):
@@ -252,39 +261,39 @@ import Foundation
             self.document = document
 
             guard let val = value else {
-                self.kind = .null(nil)
+                self.storage = .null(nil)
                 return
             }
 
             switch yyjson_get_type(val) {
             case YYJSON_TYPE_NULL:
-                self.kind = .null(val)
+                self.storage = .null(val)
             case YYJSON_TYPE_BOOL:
-                self.kind = .bool(yyjson_get_bool(val), val)
+                self.storage = .bool(yyjson_get_bool(val), val)
             case YYJSON_TYPE_NUM:
                 if yyjson_is_int(val) {
-                    self.kind = .numberInt(yyjson_get_sint(val), val)
+                    self.storage = .numberInt(yyjson_get_sint(val), val)
                 } else {
-                    self.kind = .numberDouble(yyjson_get_real(val), val)
+                    self.storage = .numberDouble(yyjson_get_real(val), val)
                 }
             case YYJSON_TYPE_STR:
                 if let str = yyjson_get_str(val) {
-                    self.kind = .stringPtr(str, val)
+                    self.storage = .stringPtr(str, val)
                 } else {
-                    self.kind = .null(val)
+                    self.storage = .null(val)
                 }
             case YYJSON_TYPE_ARR:
-                self.kind = .array(val)
+                self.storage = .array(val)
             case YYJSON_TYPE_OBJ:
-                self.kind = .object(val)
+                self.storage = .object(val)
             default:
-                self.kind = .null(val)
+                self.storage = .null(val)
             }
         }
 
         /// Whether this value is null.
         public var isNull: Bool {
-            if case .null = kind { return true }
+            if case .null = storage { return true }
             return false
         }
 
@@ -294,7 +303,7 @@ import Foundation
         /// - Returns: The value at the key,
         ///   or `nil` if not found or not an object.
         public subscript(key: String) -> YYJSONValue? {
-            guard case .object(let ptr) = kind else { return nil }
+            guard case .object(let ptr) = storage else { return nil }
             guard let val = yyObjGet(ptr, key: key) else { return nil }
             return YYJSONValue(value: val, document: document)
         }
@@ -305,7 +314,7 @@ import Foundation
         /// - Returns: The value at the index,
         ///   or `nil` if out of bounds or not an array.
         public subscript(index: Int) -> YYJSONValue? {
-            guard case .array(let ptr) = kind else { return nil }
+            guard case .array(let ptr) = storage else { return nil }
             guard let val = yyjson_arr_get(ptr, index) else { return nil }
             return YYJSONValue(value: val, document: document)
         }
@@ -316,7 +325,7 @@ import Foundation
         /// which involves a copy.
         /// For zero-allocation access in hot paths, use `.cString` instead.
         public var string: String? {
-            if case .stringPtr(let ptr, _) = kind {
+            if case .stringPtr(let ptr, _) = storage {
                 return String(cString: ptr)
             }
             return nil
@@ -330,13 +339,13 @@ import Foundation
         /// - Warning: Do not use this pointer after the `YYJSONValue`
         ///            or its originating document has been deallocated.
         public var cString: UnsafePointer<CChar>? {
-            if case .stringPtr(let ptr, _) = kind { return ptr }
+            if case .stringPtr(let ptr, _) = storage { return ptr }
             return nil
         }
 
         /// The number value, or `nil` if not a number.
         public var number: Double? {
-            switch kind {
+            switch storage {
             case .numberInt(let value, _):
                 return Double(value)
             case .numberDouble(let value, _):
@@ -348,26 +357,26 @@ import Foundation
 
         /// The Boolean value, or `nil` if not a Boolean.
         public var bool: Bool? {
-            if case .bool(let b, _) = kind { return b }
+            if case .bool(let b, _) = storage { return b }
             return nil
         }
 
         /// The object value, or `nil` if not an object.
         public var object: YYJSONObject? {
-            guard case .object(let ptr) = kind else { return nil }
+            guard case .object(let ptr) = storage else { return nil }
             return YYJSONObject(value: ptr, document: document)
         }
 
         /// The array value, or `nil` if not an array.
         public var array: YYJSONArray? {
-            guard case .array(let ptr) = kind else { return nil }
+            guard case .array(let ptr) = storage else { return nil }
             return YYJSONArray(value: ptr, document: document)
         }
     }
 
     extension YYJSONValue: CustomStringConvertible {
         public var description: String {
-            switch kind {
+            switch storage {
             case .null:
                 return "null"
             case .bool(let b, _):
