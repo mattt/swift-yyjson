@@ -243,38 +243,38 @@ public enum YYJSONSerialization {
         }
     }
 
-#if !YYJSON_DISABLE_READER && !YYJSON_DISABLE_WRITER
+    #if !YYJSON_DISABLE_READER && !YYJSON_DISABLE_WRITER
 
-    /// Serializes a `YYJSONValue` without Foundation round-tripping.
-    /// - Parameters:
-    ///   - value: The YYJSON value to write.
-    ///   - options: `YYJSONSerialization.WritingOptions` mapped to `YYJSONWriteOptions`.
-    ///     `withoutEscapingSlashes` maps to `escapeSlashes` being *absent*.
-    private static func data(withJSONValue value: YYJSONValue, options: WritingOptions) throws -> Data {
-        guard let rawValue = value.rawValue else {
-            throw YYJSONError.invalidData("Value has no backing document")
+        /// Serializes a `YYJSONValue` without Foundation round-tripping.
+        /// - Parameters:
+        ///   - value: The YYJSON value to write.
+        ///   - options: `YYJSONSerialization.WritingOptions` mapped to `YYJSONWriteOptions`.
+        ///     `withoutEscapingSlashes` maps to `escapeSlashes` being *absent*.
+        private static func data(withJSONValue value: YYJSONValue, options: WritingOptions) throws -> Data {
+            guard let rawValue = value.rawValue else {
+                throw YYJSONError.invalidData("Value has no backing document")
+            }
+
+            let isTopLevelContainer = yyjson_is_obj(rawValue) || yyjson_is_arr(rawValue)
+            if !isTopLevelContainer && !options.contains(.fragmentsAllowed) {
+                throw YYJSONError.invalidData("Top-level JSON value must be an array or dictionary")
+            }
+
+            var writeOptions: YYJSONWriteOptions = []
+            if options.contains(.prettyPrinted) {
+                writeOptions.insert(.prettyPrinted)
+            }
+            if options.contains(.sortedKeys) {
+                writeOptions.insert(.sortedKeys)
+            }
+            if !options.contains(.withoutEscapingSlashes) {
+                writeOptions.insert(.escapeSlashes)
+            }
+
+            return try value.data(options: writeOptions)
         }
 
-        let isTopLevelContainer = yyjson_is_obj(rawValue) || yyjson_is_arr(rawValue)
-        if !isTopLevelContainer && !options.contains(.fragmentsAllowed) {
-            throw YYJSONError.invalidData("Top-level JSON value must be an array or dictionary")
-        }
-
-        var writeOptions: YYJSONWriteOptions = []
-        if options.contains(.prettyPrinted) {
-            writeOptions.insert(.prettyPrinted)
-        }
-        if options.contains(.sortedKeys) {
-            writeOptions.insert(.sortedKeys)
-        }
-        if !options.contains(.withoutEscapingSlashes) {
-            writeOptions.insert(.escapeSlashes)
-        }
-
-        return try value.data(options: writeOptions)
-    }
-
-#endif  // !YYJSON_DISABLE_READER && !YYJSON_DISABLE_WRITER
+    #endif  // !YYJSON_DISABLE_READER && !YYJSON_DISABLE_WRITER
 
     #if !YYJSON_DISABLE_WRITER
         private static func foundationObjectToYYJSON(
