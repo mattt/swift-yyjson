@@ -209,16 +209,20 @@ import Foundation
         private enum Kind {
             case null
             case bool(Bool)
-            case number(Double)
+            case numberInt(Int64)
+            case numberDouble(Double)
             case stringPtr(UnsafePointer<CChar>)
-            case object(UnsafeMutablePointer<yyjson_val>)
-            case array(UnsafeMutablePointer<yyjson_val>)
+            case object
+            case array
         }
 
         private let kind: Kind
 
+        /// The raw yyjson value pointer (for serialization).
+        let rawValue: UnsafeMutablePointer<yyjson_val>?
+
         /// The document that owns this value (for lifetime management).
-        internal let document: YYDocument
+        let document: YYDocument
 
         /// Initializes from a yyjson value pointer.
         ///
@@ -227,6 +231,7 @@ import Foundation
         ///   - document: The document that owns this value (for lifetime management).
         init(value: UnsafeMutablePointer<yyjson_val>?, document: YYDocument) {
             self.document = document
+            self.rawValue = value
 
             guard let val = value else {
                 self.kind = .null
@@ -239,13 +244,11 @@ import Foundation
             case YYJSON_TYPE_BOOL:
                 self.kind = .bool(yyjson_get_bool(val))
             case YYJSON_TYPE_NUM:
-                let num: Double
                 if yyjson_is_int(val) {
-                    num = Double(yyjson_get_sint(val))
+                    self.kind = .numberInt(yyjson_get_sint(val))
                 } else {
-                    num = yyjson_get_real(val)
+                    self.kind = .numberDouble(yyjson_get_real(val))
                 }
-                self.kind = .number(num)
             case YYJSON_TYPE_STR:
                 if let str = yyjson_get_str(val) {
                     self.kind = .stringPtr(str)
@@ -253,9 +256,9 @@ import Foundation
                     self.kind = .null
                 }
             case YYJSON_TYPE_ARR:
-                self.kind = .array(val)
+                self.kind = .array
             case YYJSON_TYPE_OBJ:
-                self.kind = .object(val)
+                self.kind = .object
             default:
                 self.kind = .null
             }
@@ -273,8 +276,8 @@ import Foundation
         /// - Returns: The value at the key,
         ///   or `nil` if not found or not an object.
         public subscript(key: String) -> YYJSONValue? {
-            guard case .object(let ptr) = kind else { return nil }
-            guard let val = yyObjGet(ptr, key: key) else { return nil }
+            guard case .object = kind, let rawValue else { return nil }
+            guard let val = yyObjGet(rawValue, key: key) else { return nil }
             return YYJSONValue(value: val, document: document)
         }
 
@@ -284,8 +287,8 @@ import Foundation
         /// - Returns: The value at the index,
         ///   or `nil` if out of bounds or not an array.
         public subscript(index: Int) -> YYJSONValue? {
-            guard case .array(let ptr) = kind else { return nil }
-            guard let val = yyjson_arr_get(ptr, index) else { return nil }
+            guard case .array = kind, let rawValue else { return nil }
+            guard let val = yyjson_arr_get(rawValue, index) else { return nil }
             return YYJSONValue(value: val, document: document)
         }
 
@@ -315,8 +318,14 @@ import Foundation
 
         /// The number value, or `nil` if not a number.
         public var number: Double? {
-            if case .number(let num) = kind { return num }
-            return nil
+            switch kind {
+            case .numberInt(let value):
+                return Double(value)
+            case .numberDouble(let value):
+                return value
+            default:
+                return nil
+            }
         }
 
         /// The Boolean value, or `nil` if not a Boolean.
@@ -327,14 +336,14 @@ import Foundation
 
         /// The object value, or `nil` if not an object.
         public var object: YYJSONObject? {
-            guard case .object(let ptr) = kind else { return nil }
-            return YYJSONObject(value: ptr, document: document)
+            guard case .object = kind, let rawValue else { return nil }
+            return YYJSONObject(value: rawValue, document: document)
         }
 
         /// The array value, or `nil` if not an array.
         public var array: YYJSONArray? {
-            guard case .array(let ptr) = kind else { return nil }
-            return YYJSONArray(value: ptr, document: document)
+            guard case .array = kind, let rawValue else { return nil }
+            return YYJSONArray(value: rawValue, document: document)
         }
     }
 
@@ -345,14 +354,18 @@ import Foundation
                 return "null"
             case .bool(let b):
                 return b ? "true" : "false"
-            case .number(let n):
+            case .numberInt(let n):
+                return String(Double(n))
+            case .numberDouble(let n):
                 return String(n)
             case .stringPtr(let ptr):
                 return "\"\(String(cString: ptr))\""
-            case .object(let ptr):
-                return YYJSONObject(value: ptr, document: document).description
-            case .array(let ptr):
-                return YYJSONArray(value: ptr, document: document).description
+            case .object:
+                guard let rawValue else { return "null" }
+                return YYJSONObject(value: rawValue, document: document).description
+            case .array:
+                guard let rawValue else { return "null" }
+                return YYJSONArray(value: rawValue, document: document).description
             }
         }
     }
@@ -584,5 +597,125 @@ import Foundation
             return YYJSONValue(value: root, document: document)
         }
     }
+
+    #if !YYJSON_DISABLE_WRITER
+
+        // MARK: - Writing
+
+        extension YYJSONValue {
+            /// Returns JSON data for this value.
+            /// - Parameter options: Options for writing JSON.
+            /// - Returns: The encoded JSON data.
+            /// - Throws: `YYJSONError` if writing fails.
+            public func data(options: YYJSONWriteOptions = .default) throws -> Data {
+                guard let rawValue = rawValue else {
+                    throw YYJSONError.invalidData("Value has no backing document")
+                }
+
+                if options.contains(.sortedKeys) {
+                    guard let doc = yyjson_mut_doc_new(nil) else {
+                        throw YYJSONError.invalidData("Failed to create document")
+                    }
+                    defer {
+                        yyjson_mut_doc_free(doc)
+                    }
+
+                    guard let mutableValue = yyjson_val_mut_copy(doc, rawValue) else {
+                        throw YYJSONError.invalidData("Failed to copy value")
+                    }
+
+                    try sortObjectKeys(mutableValue)
+
+                    return try writeJSONData(mutableValue, options: options)
+                }
+
+                return try writeJSONData(rawValue, options: options)
+            }
+        }
+
+        private func writeJSONData(
+            _ value: UnsafeMutablePointer<yyjson_val>,
+            options: YYJSONWriteOptions
+        ) throws -> Data {
+            var error = yyjson_write_err()
+            var length: size_t = 0
+
+            guard let jsonString = yyjson_val_write_opts(value, options.yyjsonFlags, nil, &length, &error) else {
+                throw YYJSONError(writing: error)
+            }
+
+            defer {
+                free(jsonString)
+            }
+
+            return Data(bytes: jsonString, count: length)
+        }
+
+        private func writeJSONData(
+            _ value: UnsafeMutablePointer<yyjson_mut_val>,
+            options: YYJSONWriteOptions
+        ) throws -> Data {
+            var error = yyjson_write_err()
+            var length: size_t = 0
+
+            guard let jsonString = yyjson_mut_val_write_opts(value, options.yyjsonFlags, nil, &length, &error) else {
+                throw YYJSONError(writing: error)
+            }
+
+            defer {
+                free(jsonString)
+            }
+
+            return Data(bytes: jsonString, count: length)
+        }
+
+        private func sortObjectKeys(_ val: UnsafeMutablePointer<yyjson_mut_val>) throws {
+            typealias MutVal = UnsafeMutablePointer<yyjson_mut_val>
+
+            if yyjson_mut_is_obj(val) {
+                var pairs: [(keyVal: MutVal, val: MutVal, keyStr: UnsafePointer<CChar>)] = []
+                pairs.reserveCapacity(Int(yyjson_mut_obj_size(val)))
+
+                var iter = yyjson_mut_obj_iter()
+                guard yyjson_mut_obj_iter_init(val, &iter) else {
+                    throw YYJSONError.invalidData("Failed to initialize object iterator during key sorting")
+                }
+
+                while let keyPtr = yyjson_mut_obj_iter_next(&iter) {
+                    guard let valPtr = yyjson_mut_obj_iter_get_val(keyPtr) else {
+                        throw YYJSONError.invalidData("Object key has no associated value during key sorting")
+                    }
+                    guard let keyStr = yyjson_mut_get_str(keyPtr) else {
+                        throw YYJSONError.invalidData("Object key is not a string during key sorting")
+                    }
+                    pairs.append((keyPtr, valPtr, keyStr))
+                }
+
+                pairs.sort { pair1, pair2 in
+                    return strcmp(pair1.keyStr, pair2.keyStr) < 0
+                }
+
+                guard yyjson_mut_obj_clear(val) else {
+                    throw YYJSONError.invalidData("Failed to clear object during key sorting")
+                }
+
+                for pair in pairs {
+                    try sortObjectKeys(pair.val)
+                    guard yyjson_mut_obj_add(val, pair.keyVal, pair.val) else {
+                        throw YYJSONError.invalidData("Failed to add key back to object during key sorting")
+                    }
+                }
+            } else if yyjson_mut_is_arr(val) {
+                var iter = yyjson_mut_arr_iter()
+                guard yyjson_mut_arr_iter_init(val, &iter) else {
+                    throw YYJSONError.invalidData("Failed to initialize array iterator during key sorting")
+                }
+                while let elem = yyjson_mut_arr_iter_next(&iter) {
+                    try sortObjectKeys(elem)
+                }
+            }
+        }
+
+    #endif  // !YYJSON_DISABLE_WRITER
 
 #endif  // !YYJSON_DISABLE_READER
