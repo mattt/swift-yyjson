@@ -658,7 +658,11 @@ import Foundation
             }
         }
 
-        private func writeJSONData(
+        // MARK: - Helpers
+
+        /// Serialize an immutable yyjson value into `Data` using the given options.
+        /// - Throws: `YYJSONError` if serialization fails.
+        func writeJSONData(
             _ value: UnsafeMutablePointer<yyjson_val>,
             options: YYJSONWriteOptions
         ) throws -> Data {
@@ -676,7 +680,9 @@ import Foundation
             return Data(bytes: jsonString, count: length)
         }
 
-        private func writeJSONData(
+        /// Serialize a mutable yyjson value into `Data` using the given options.
+        /// - Throws: `YYJSONError` if serialization fails.
+        func writeJSONData(
             _ value: UnsafeMutablePointer<yyjson_mut_val>,
             options: YYJSONWriteOptions
         ) throws -> Data {
@@ -694,7 +700,13 @@ import Foundation
             return Data(bytes: jsonString, count: length)
         }
 
-        private func sortObjectKeys(_ val: UnsafeMutablePointer<yyjson_mut_val>) throws {
+        /// Recursively sort object keys in-place using UTF-8 lexicographical comparison (strcmp).
+        /// This matches Apple's JSONEncoder behavior for typical keys, but embedded null bytes
+        /// may compare differently due to C string semantics.
+        ///
+        /// - Note: Uses direct C string comparison via `strcmp` for optimal performance,
+        ///   avoiding Swift String allocations during sorting.
+        func sortObjectKeys(_ val: UnsafeMutablePointer<yyjson_mut_val>) throws {
             typealias MutVal = UnsafeMutablePointer<yyjson_mut_val>
 
             if yyjson_mut_is_obj(val) {
