@@ -116,6 +116,11 @@ jobs:
         trait:
           - "noReader"
           - "noWriter"
+          - "noIncrementalReader"
+          - "noUtilities"
+          - "noFastFloatingPoint"
+          - "strictStandardJSON"
+          - "noUTF8Validation"
     timeout-minutes: 10
     steps:
       - name: Checkout code
