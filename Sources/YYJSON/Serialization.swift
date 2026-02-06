@@ -382,18 +382,7 @@ public enum YYJSONSerialization {
 
             if let s = string {
                 if options.contains(.mutableLeaves) {
-                    #if canImport(Darwin)
-                        return NSMutableString(string: s)
-                    #else
-                        // On Linux, using mutableCopy() provides more consistent behavior
-                        // across Foundation implementations than direct initialization.
-                        guard let mutable = (s as NSString).mutableCopy() as? NSMutableString else {
-                            throw YYJSONError.invalidData(
-                                "Failed to create mutable string copy on Linux"
-                            )
-                        }
-                        return mutable
-                    #endif
+                    return try makeMutableString(from: s)
                 }
                 return NSString(string: s)
             }
@@ -463,5 +452,24 @@ private func isBoolNumber(_ num: NSNumber) -> Bool {
         return CFGetTypeID(num) == CFBooleanGetTypeID()
     #else
         return num === nsBoolTrue || num === nsBoolFalse
+    #endif
+}
+
+/// Creates a mutable string from a Swift `String`.
+///
+/// On Darwin, initialize `NSMutableString` directly.
+/// On Linux (swift-corelibs-foundation),
+/// use `mutableCopy()` to ensure consistent mutability.
+private func makeMutableString(from string: String) throws -> NSMutableString {
+    #if canImport(Darwin)
+        return NSMutableString(string: string)
+    #else
+        // Unlikely to fail, but prefer explicit error over force-casting.
+        guard let mutable = (string as NSString).mutableCopy() as? NSMutableString else {
+            throw YYJSONError.invalidData(
+                "Failed to create mutable string copy on Linux"
+            )
+        }
+        return mutable
     #endif
 }
