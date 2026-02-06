@@ -1,29 +1,6 @@
 import Cyyjson
 import Foundation
 
-/// Determines if an NSNumber represents a boolean value.
-///
-/// On Darwin, we use CoreFoundation's `CFBooleanGetTypeID()` which reliably
-/// identifies boolean NSNumbers. On Linux (swift-corelibs-foundation),
-/// `CFGetTypeID`/`CFBooleanGetTypeID` are unavailable, so we compare against
-/// cached singleton instances. This works because Foundation reuses the same
-/// NSNumber instances for `true` and `false`.
-#if canImport(Darwin)
-    @inline(__always)
-    private func isBoolNumber(_ num: NSNumber) -> Bool {
-        CFGetTypeID(num) == CFBooleanGetTypeID()
-    }
-#else
-    // Cache singleton bool NSNumbers for identity comparison on Linux
-    private let _nsBoolTrue = NSNumber(value: true)
-    private let _nsBoolFalse = NSNumber(value: false)
-
-    @inline(__always)
-    private func isBoolNumber(_ num: NSNumber) -> Bool {
-        num === _nsBoolTrue || num === _nsBoolFalse
-    }
-#endif
-
 /// An object that converts between JSON and the equivalent Foundation objects.
 /// This provides a drop-in replacement for Foundation's JSONSerialization using yyjson.
 public enum YYJSONSerialization {
@@ -462,3 +439,29 @@ public enum YYJSONSerialization {
     }
 
 #endif  // !YYJSON_DISABLE_READER
+
+// MARK: - Helper Functions
+
+#if !canImport(Darwin)
+    // Cache singleton bool NSNumbers for identity comparison on Linux.
+    private let nsBoolTrue = NSNumber(value: true)
+    private let nsBoolFalse = NSNumber(value: false)
+#endif
+
+/// Determines whether an `NSNumber` represents a Boolean value.
+///
+/// On Darwin, use CoreFoundation's `CFBooleanGetTypeID()`
+/// to reliably identify Boolean `NSNumber` instances.
+/// On Linux (swift-corelibs-foundation),
+/// `CFGetTypeID` and `CFBooleanGetTypeID` are unavailable,
+/// so compare against cached singleton instances.
+/// This works because Foundation reuses the same `NSNumber`
+/// instances for `true` and `false`.
+@inline(__always)
+private func isBoolNumber(_ num: NSNumber) -> Bool {
+    #if canImport(Darwin)
+        return CFGetTypeID(num) == CFBooleanGetTypeID()
+    #else
+        return num === nsBoolTrue || num === nsBoolFalse
+    #endif
+}
