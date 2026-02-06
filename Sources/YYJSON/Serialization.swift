@@ -300,7 +300,7 @@ public enum YYJSONSerialization {
                     throw YYJSONError.invalidData("NaN or Infinity not allowed in JSON")
                 }
 
-                if CFGetTypeID(num) == CFBooleanGetTypeID() {
+                if isBoolNumber(num) {
                     return yyjson_mut_bool(doc, num.boolValue)
                 }
 
@@ -382,7 +382,7 @@ public enum YYJSONSerialization {
 
             if let s = string {
                 if options.contains(.mutableLeaves) {
-                    return NSMutableString(string: s)
+                    return try makeMutableString(from: s)
                 }
                 return NSString(string: s)
             }
@@ -428,3 +428,48 @@ public enum YYJSONSerialization {
     }
 
 #endif  // !YYJSON_DISABLE_READER
+
+// MARK: - Helper Functions
+
+#if !canImport(Darwin)
+    // Cache singleton bool NSNumbers for identity comparison on Linux.
+    private let nsBoolTrue = NSNumber(value: true)
+    private let nsBoolFalse = NSNumber(value: false)
+#endif
+
+/// Determines whether an `NSNumber` represents a Boolean value.
+///
+/// On Darwin, use CoreFoundation's `CFBooleanGetTypeID()`
+/// to reliably identify Boolean `NSNumber` instances.
+/// On Linux (swift-corelibs-foundation),
+/// `CFGetTypeID` and `CFBooleanGetTypeID` are unavailable,
+/// so compare against cached singleton instances.
+/// This works because Foundation reuses the same `NSNumber`
+/// instances for `true` and `false`.
+@inline(__always)
+private func isBoolNumber(_ num: NSNumber) -> Bool {
+    #if canImport(Darwin)
+        return CFGetTypeID(num) == CFBooleanGetTypeID()
+    #else
+        return num === nsBoolTrue || num === nsBoolFalse
+    #endif
+}
+
+/// Creates a mutable string from a Swift `String`.
+///
+/// On Darwin, initialize `NSMutableString` directly.
+/// On Linux (swift-corelibs-foundation),
+/// use `mutableCopy()` to ensure consistent mutability.
+private func makeMutableString(from string: String) throws -> NSMutableString {
+    #if canImport(Darwin)
+        return NSMutableString(string: string)
+    #else
+        // Unlikely to fail, but prefer explicit error over force-casting.
+        guard let mutable = (string as NSString).mutableCopy() as? NSMutableString else {
+            throw YYJSONError.invalidData(
+                "Failed to create mutable string copy on Linux"
+            )
+        }
+        return mutable
+    #endif
+}

@@ -8,7 +8,7 @@ on:
 
 jobs:
   test-macos:
-    name: "Swift ${{ matrix.swift }} on macOS ${{ matrix.macos }} with Xcode ${{ matrix.xcode }}"
+    name: "Swift ${{ matrix.swift }} on macOS"
     runs-on: macos-${{ matrix.macos }}
     env:
       DEVELOPER_DIR: "/Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer"
@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Cache Swift Package Manager dependencies
         uses: actions/cache@v4
@@ -47,7 +47,7 @@ jobs:
         run: swift test
 
   test-macos-traits:
-    name: "Swift 6.1 on macOS 15 with Xcode 16.3 and trait ${{ matrix.trait }}"
+    name: "Swift 6.1 on macOS with trait ${{ matrix.trait }}"
     runs-on: macos-15
     env:
       DEVELOPER_DIR: "/Applications/Xcode_16.3.app/Contents/Developer"
@@ -65,7 +65,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Cache Swift Package Manager dependencies
         uses: actions/cache@v4
@@ -76,6 +76,63 @@ jobs:
           key: ${{ runner.os }}-swift-6.1-spm-${{ hashFiles('**/Package.resolved') }}-${{ matrix.trait }}
           restore-keys: |
             ${{ runner.os }}-swift-6.1-spm-
+
+      - name: Test
+        run: swift test --traits ${{ matrix.trait }}
+
+  test-linux:
+    name: "Swift ${{ matrix.swift-version }} on Linux"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        swift-version:
+          - "6.1"
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Swift
+        uses: vapor/swiftly-action@v0.2
+        with:
+          toolchain: ${{ matrix.swift-version }}
+
+      - name: Lint
+        run: swift format lint --strict --recursive .
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
+
+  test-linux-traits:
+    name: "Swift 6.1 on Linux with trait ${{ matrix.trait }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        trait:
+          - "noReader"
+          - "noWriter"
+          - "noIncrementalReader"
+          - "noUtilities"
+          - "noFastFloatingPoint"
+          - "strictStandardJSON"
+          - "noUTF8Validation"
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Swift
+        uses: vapor/swiftly-action@v0.2
+        with:
+          toolchain: "6.1"
+
+      - name: Build
+        run: swift build --traits ${{ matrix.trait }}
 
       - name: Test
         run: swift test --traits ${{ matrix.trait }}
