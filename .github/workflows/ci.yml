@@ -8,7 +8,7 @@ on:
 
 jobs:
   test-macos:
-    name: "Swift ${{ matrix.swift }} on macOS ${{ matrix.macos }} with Xcode ${{ matrix.xcode }}"
+    name: "Swift ${{ matrix.swift }} on macOS"
     runs-on: macos-${{ matrix.macos }}
     env:
       DEVELOPER_DIR: "/Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer"
@@ -47,7 +47,7 @@ jobs:
         run: swift test
 
   test-macos-traits:
-    name: "Swift 6.1 on macOS 15 with Xcode 16.3 and trait ${{ matrix.trait }}"
+    name: "Swift 6.1 on macOS with trait ${{ matrix.trait }}"
     runs-on: macos-15
     env:
       DEVELOPER_DIR: "/Applications/Xcode_16.3.app/Contents/Developer"
@@ -81,7 +81,7 @@ jobs:
         run: swift test --traits ${{ matrix.trait }}
 
   test-linux:
-    name: Swift ${{ matrix.swift-version }} on Linux
+    name: "Swift ${{ matrix.swift-version }} on Linux"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -108,7 +108,7 @@ jobs:
         run: swift test
 
   test-linux-traits:
-    name: Linux with trait ${{ matrix.trait }}
+    name: "Swift 6.1 on Linux with trait ${{ matrix.trait }}"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
