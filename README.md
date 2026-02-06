@@ -323,6 +323,11 @@ Available writing options:
 - `.escapeUnicode` — Escape non-ASCII characters as `\uXXXX`
 - `.newlineAtEnd` — Add trailing newline `\n`
 
+Non-standard options (unavailable when `strictStandardJSON` trait is enabled):
+
+- `.allowInfAndNaN` — Write `Infinity` and `NaN` literals
+- `.infAndNaNAsNull` — Write `Infinity` and `NaN` as `null` (takes precedence)
+
 ## Read and Write Options
 
 ### Reading Options
@@ -375,7 +380,7 @@ Available options:
 Non-standard options (unavailable when `strictStandardJSON` trait is enabled):
 
 - `.allowInfAndNaN` — Write `Infinity` and `NaN` literals
-- `.infAndNaNAsNull` — Write `Infinity` and `NaN` as `null`
+- `.infAndNaNAsNull` — Write `Infinity` and `NaN` as `null` (takes precedence)
 
 ## Package Traits
 

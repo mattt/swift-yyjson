@@ -168,6 +168,59 @@ import Testing
             #expect(json == "[1,2,3,4,5]")
         }
 
+        #if !YYJSON_DISABLE_NON_STANDARD
+
+            @Test func writeAllowsInfAndNaNLiterals() throws {
+                let dict: NSDictionary = [
+                    "inf": Double.infinity,
+                    "nan": Double.nan,
+                ]
+                let data = try YYJSONSerialization.data(
+                    withJSONObject: dict,
+                    options: .allowInfAndNaN
+                )
+                let json = String(data: data, encoding: .utf8)!
+                #expect(json.contains("Infinity") || json.contains("inf"))
+                #expect(json.contains("NaN") || json.contains("nan"))
+            }
+
+            @Test func writeInfAndNaNAsNull() throws {
+                let dict: NSDictionary = [
+                    "inf": Double.infinity,
+                    "nan": Double.nan,
+                ]
+                let data = try YYJSONSerialization.data(
+                    withJSONObject: dict,
+                    options: .infAndNaNAsNull
+                )
+                let json = String(data: data, encoding: .utf8)!
+                #expect(json.contains("\"inf\":null"))
+                #expect(json.contains("\"nan\":null"))
+            }
+
+            @Test func writeInfAndNaNAsNullOverridesAllowInfAndNaN() throws {
+                let dict: NSDictionary = [
+                    "inf": Double.infinity,
+                    "nan": Double.nan,
+                ]
+                let data = try YYJSONSerialization.data(
+                    withJSONObject: dict,
+                    options: [.allowInfAndNaN, .infAndNaNAsNull]
+                )
+                let json = String(data: data, encoding: .utf8)!
+                #expect(json.contains("\"inf\":null"))
+                #expect(json.contains("\"nan\":null"))
+            }
+
+            @Test func writeNonFiniteWithoutOptionThrows() throws {
+                let dict: NSDictionary = ["value": Double.nan]
+                #expect(throws: YYJSONError.self) {
+                    _ = try YYJSONSerialization.data(withJSONObject: dict)
+                }
+            }
+
+        #endif  // !YYJSON_DISABLE_NON_STANDARD
+
         #if !YYJSON_DISABLE_READER
 
             private static func jsonString(

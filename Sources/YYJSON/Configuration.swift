@@ -93,10 +93,14 @@ public struct YYJSONWriteOptions: OptionSet, Sendable {
 
     #if !YYJSON_DISABLE_NON_STANDARD
 
-        /// Write inf and nan number as 'Infinity' and 'NaN' literal.
+        /// Writes infinity and NaN values as `Infinity` and `NaN` literals.
+        ///
+        /// If you set `infAndNaNAsNull`, it takes precedence.
         public static let allowInfAndNaN = YYJSONWriteOptions(rawValue: YYJSON_WRITE_ALLOW_INF_AND_NAN)
 
-        /// Write inf and nan number as null literal.
+        /// Writes infinity and NaN values as `null` literals.
+        ///
+        /// This option takes precedence over `allowInfAndNaN`.
         public static let infAndNaNAsNull = YYJSONWriteOptions(rawValue: YYJSON_WRITE_INF_AND_NAN_AS_NULL)
 
     #endif  // !YYJSON_DISABLE_NON_STANDARD

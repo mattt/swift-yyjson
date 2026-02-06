@@ -64,6 +64,20 @@ public enum YYJSONSerialization {
 
         /// Add a single newline character `\n` at the end of the JSON.
         public static let newlineAtEnd = WritingOptions(rawValue: 1 << 6)
+
+        #if !YYJSON_DISABLE_NON_STANDARD
+
+            /// Writes infinity and NaN values as `Infinity` and `NaN` literals.
+            ///
+            /// If you set `infAndNaNAsNull`, it takes precedence.
+            public static let allowInfAndNaN = WritingOptions(rawValue: 1 << 7)
+
+            /// Writes infinity and NaN values as `null` literals.
+            ///
+            /// This option takes precedence over `allowInfAndNaN`.
+            public static let infAndNaNAsNull = WritingOptions(rawValue: 1 << 8)
+
+        #endif  // !YYJSON_DISABLE_NON_STANDARD
     }
 
     /// Returns a Foundation object from given JSON data.
@@ -127,8 +141,17 @@ public enum YYJSONSerialization {
             let isTopLevelContainer = obj is NSArray || obj is NSDictionary
             let isFragment = obj is NSString || obj is NSNumber || obj is NSNull
 
+            let allowNonFiniteNumbers: Bool
+            #if !YYJSON_DISABLE_NON_STANDARD
+                allowNonFiniteNumbers =
+                    options.contains(.infAndNaNAsNull)
+                    || options.contains(.allowInfAndNaN)
+            #else
+                allowNonFiniteNumbers = false
+            #endif
+
             if isTopLevelContainer {
-                guard isValidJSONObject(obj) else {
+                guard isValidJSONObject(obj, allowNonFiniteNumbers: allowNonFiniteNumbers) else {
                     throw YYJSONError.invalidData("Invalid JSON object")
                 }
             } else if isFragment {
@@ -166,6 +189,15 @@ public enum YYJSONSerialization {
                 flags |= YYJSON_WRITE_ESCAPE_UNICODE
             }
 
+            #if !YYJSON_DISABLE_NON_STANDARD
+                if options.contains(.allowInfAndNaN) {
+                    flags |= YYJSON_WRITE_ALLOW_INF_AND_NAN
+                }
+                if options.contains(.infAndNaNAsNull) {
+                    flags |= YYJSON_WRITE_INF_AND_NAN_AS_NULL
+                }
+            #endif
+
             // Formatting options
             if options.contains(.newlineAtEnd) {
                 flags |= YYJSON_WRITE_NEWLINE_AT_END
@@ -197,12 +229,22 @@ public enum YYJSONSerialization {
         guard obj is NSArray || obj is NSDictionary else {
             return false
         }
-        return isValidJSONObjectRecursive(obj)
+        return isValidJSONObjectRecursive(obj, allowNonFiniteNumbers: false)
     }
 
     // MARK: - Private Helpers
 
-    private static func isValidJSONObjectRecursive(_ obj: Any) -> Bool {
+    private static func isValidJSONObject(_ obj: Any, allowNonFiniteNumbers: Bool) -> Bool {
+        guard obj is NSArray || obj is NSDictionary else {
+            return false
+        }
+        return isValidJSONObjectRecursive(obj, allowNonFiniteNumbers: allowNonFiniteNumbers)
+    }
+
+    private static func isValidJSONObjectRecursive(
+        _ obj: Any,
+        allowNonFiniteNumbers: Bool
+    ) -> Bool {
         switch obj {
         case let dict as NSDictionary:
             for (key, value) in dict {
@@ -211,11 +253,11 @@ public enum YYJSONSerialization {
                 }
                 if let number = value as? NSNumber {
                     let doubleValue = number.doubleValue
-                    if doubleValue.isNaN || doubleValue.isInfinite {
+                    if !allowNonFiniteNumbers && (doubleValue.isNaN || doubleValue.isInfinite) {
                         return false
                     }
                 }
-                if !isValidJSONObjectRecursive(value) {
+                if !isValidJSONObjectRecursive(value, allowNonFiniteNumbers: allowNonFiniteNumbers) {
                     return false
                 }
             }
@@ -225,11 +267,11 @@ public enum YYJSONSerialization {
             for element in arr {
                 if let number = element as? NSNumber {
                     let doubleValue = number.doubleValue
-                    if doubleValue.isNaN || doubleValue.isInfinite {
+                    if !allowNonFiniteNumbers && (doubleValue.isNaN || doubleValue.isInfinite) {
                         return false
                     }
                 }
-                if !isValidJSONObjectRecursive(element) {
+                if !isValidJSONObjectRecursive(element, allowNonFiniteNumbers: allowNonFiniteNumbers) {
                     return false
                 }
             }
@@ -278,6 +320,14 @@ public enum YYJSONSerialization {
             if options.contains(.newlineAtEnd) {
                 writeOptions.insert(.newlineAtEnd)
             }
+            #if !YYJSON_DISABLE_NON_STANDARD
+                if options.contains(.allowInfAndNaN) {
+                    writeOptions.insert(.allowInfAndNaN)
+                }
+                if options.contains(.infAndNaNAsNull) {
+                    writeOptions.insert(.infAndNaNAsNull)
+                }
+            #endif
 
             return try value.data(options: writeOptions)
         }
@@ -297,6 +347,14 @@ public enum YYJSONSerialization {
             case let num as NSNumber:
                 let doubleValue = num.doubleValue
                 if doubleValue.isNaN || doubleValue.isInfinite {
+                    #if !YYJSON_DISABLE_NON_STANDARD
+                        if options.contains(.infAndNaNAsNull) {
+                            return yyjson_mut_null(doc)
+                        }
+                        if options.contains(.allowInfAndNaN) {
+                            return yyjson_mut_real(doc, doubleValue)
+                        }
+                    #endif
                     throw YYJSONError.invalidData("NaN or Infinity not allowed in JSON")
                 }
 
