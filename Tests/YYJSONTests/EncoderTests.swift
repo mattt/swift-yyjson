@@ -415,9 +415,9 @@ import Testing
             #expect(result.contains("    "))
         }
 
-        @Test func encodePrettyPrintedTwoSpaces() throws {
+        @Test func encodeIndentationTwoSpaces() throws {
             var encoder = YYJSONEncoder()
-            encoder.writeOptions = .prettyPrintedTwoSpaces
+            encoder.writeOptions = .indentationTwoSpaces
             let value = SimpleStruct(name: "test", value: 42)
             let data = try encoder.encode(value)
             let result = String(data: data, encoding: .utf8)!
@@ -501,14 +501,14 @@ import Testing
             #expect(outerA < outerZ)
         }
 
-        @Test func encodeSortedKeysPrettyTwoSpaces() throws {
+        @Test func encodeSortedKeysIndentationTwoSpaces() throws {
             struct Item: Encodable {
                 let b: Int
                 let a: Int
             }
 
             var encoder = YYJSONEncoder()
-            encoder.writeOptions = [.prettyPrintedTwoSpaces, .sortedKeys]
+            encoder.writeOptions = [.indentationTwoSpaces, .sortedKeys]
             let data = try encoder.encode(Item(b: 2, a: 1))
             let json = String(data: data, encoding: .utf8)!
 

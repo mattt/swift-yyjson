@@ -253,17 +253,17 @@ import Testing
                 #expect(json.contains("\n"))
             }
 
-            @Test func writeYYJSONValuePrettyPrintedTwoSpaces() throws {
+            @Test func writeYYJSONValueIndentationTwoSpaces() throws {
                 let value = try YYJSONValue(string: #"{"key":"value"}"#)
                 let json = try Self.jsonString(
                     for: value,
-                    options: [.prettyPrintedTwoSpaces]
+                    options: [.indentationTwoSpaces]
                 )
                 #expect(json.contains("  \"key\""))
                 #expect(!json.contains("    \"key\""))
             }
 
-            @Test func writeYYJSONObjectPrettyPrintedTwoSpaces() throws {
+            @Test func writeYYJSONObjectIndentationTwoSpaces() throws {
                 let value = try YYJSONValue(string: #"{"key":"value"}"#)
                 guard let object = value.object else {
                     Issue.record("Expected object")
@@ -271,13 +271,13 @@ import Testing
                 }
                 let json = try Self.jsonString(
                     for: object,
-                    options: [.prettyPrintedTwoSpaces]
+                    options: [.indentationTwoSpaces]
                 )
                 #expect(json.contains("  \"key\""))
                 #expect(!json.contains("    \"key\""))
             }
 
-            @Test func writeYYJSONArrayPrettyPrintedTwoSpaces() throws {
+            @Test func writeYYJSONArrayIndentationTwoSpaces() throws {
                 let value = try YYJSONValue(string: #"[{"key":"value"}]"#)
                 guard let array = value.array else {
                     Issue.record("Expected array")
@@ -285,17 +285,17 @@ import Testing
                 }
                 let json = try Self.jsonString(
                     for: array,
-                    options: [.prettyPrintedTwoSpaces]
+                    options: [.indentationTwoSpaces]
                 )
                 #expect(json.contains("\n  {"))
                 #expect(!json.contains("\n    {"))
             }
 
-            @Test func writeYYJSONValuePrettyPrintedTwoSpacesOverridesPrettyPrinted() throws {
+            @Test func writeYYJSONValueIndentationTwoSpacesOverridesPrettyPrinted() throws {
                 let value = try YYJSONValue(string: #"{"key":"value"}"#)
                 let json = try Self.jsonString(
                     for: value,
-                    options: [.prettyPrinted, .prettyPrintedTwoSpaces]
+                    options: [.prettyPrinted, .indentationTwoSpaces]
                 )
                 #expect(json.contains("  \"key\""))
                 #expect(!json.contains("    \"key\""))
@@ -374,11 +374,11 @@ import Testing
                 #expect(json.hasSuffix("\n"))
             }
 
-            @Test func writeYYJSONValuePrettyPrintedTwoSpacesSortedKeys() throws {
+            @Test func writeYYJSONValueIndentationTwoSpacesSortedKeys() throws {
                 let value = try YYJSONValue(string: #"{"b":2,"a":1}"#)
                 let json = try Self.jsonString(
                     for: value,
-                    options: [.prettyPrintedTwoSpaces, .sortedKeys]
+                    options: [.indentationTwoSpaces, .sortedKeys]
                 )
                 let aIndex = json.range(of: "\"a\"")!.lowerBound
                 let bIndex = json.range(of: "\"b\"")!.lowerBound
@@ -386,7 +386,7 @@ import Testing
                 #expect(json.contains("  \"a\""))
             }
 
-            @Test func writeYYJSONObjectPrettyPrintedTwoSpacesSortedKeys() throws {
+            @Test func writeYYJSONObjectIndentationTwoSpacesSortedKeys() throws {
                 let value = try YYJSONValue(string: #"{"b":2,"a":1}"#)
                 guard let object = value.object else {
                     Issue.record("Expected object")
@@ -394,7 +394,7 @@ import Testing
                 }
                 let json = try Self.jsonString(
                     for: object,
-                    options: [.prettyPrintedTwoSpaces, .sortedKeys]
+                    options: [.indentationTwoSpaces, .sortedKeys]
                 )
                 let aIndex = json.range(of: "\"a\"")!.lowerBound
                 let bIndex = json.range(of: "\"b\"")!.lowerBound
@@ -402,7 +402,7 @@ import Testing
                 #expect(json.contains("  \"a\""))
             }
 
-            @Test func writeYYJSONArrayPrettyPrintedTwoSpacesSortedKeys() throws {
+            @Test func writeYYJSONArrayIndentationTwoSpacesSortedKeys() throws {
                 let value = try YYJSONValue(string: #"[{"b":2,"a":1}]"#)
                 guard let array = value.array else {
                     Issue.record("Expected array")
@@ -410,7 +410,7 @@ import Testing
                 }
                 let json = try Self.jsonString(
                     for: array,
-                    options: [.prettyPrintedTwoSpaces, .sortedKeys]
+                    options: [.indentationTwoSpaces, .sortedKeys]
                 )
                 let aIndex = json.range(of: "\"a\"")!.lowerBound
                 let bIndex = json.range(of: "\"b\"")!.lowerBound
@@ -527,13 +527,13 @@ import Testing
             }
         }
 
-        // MARK: - prettyPrintedTwoSpaces
+        // MARK: - indentationTwoSpaces
 
-        @Test func writePrettyPrintedTwoSpaces() throws {
+        @Test func writeIndentationTwoSpaces() throws {
             let dict: NSDictionary = ["key": "value"]
             let data = try YYJSONSerialization.data(
                 withJSONObject: dict,
-                options: [.prettyPrintedTwoSpaces]
+                options: [.indentationTwoSpaces]
             )
             let json = String(data: data, encoding: .utf8)!
             // Should use 2-space indentation (not 4-space)
@@ -541,11 +541,11 @@ import Testing
             #expect(!json.contains("    \"key\""))
         }
 
-        @Test func writePrettyPrintedTwoSpacesOverridesPrettyPrinted() throws {
+        @Test func writeIndentationTwoSpacesOverridesPrettyPrinted() throws {
             let dict: NSDictionary = ["a": 1]
             let data = try YYJSONSerialization.data(
                 withJSONObject: dict,
-                options: [.prettyPrinted, .prettyPrintedTwoSpaces]
+                options: [.prettyPrinted, .indentationTwoSpaces]
             )
             let json = String(data: data, encoding: .utf8)!
             // 2-space should take priority
@@ -553,11 +553,11 @@ import Testing
             #expect(!json.contains("    \"a\""))
         }
 
-        @Test func writePrettyPrintedTwoSpacesWithSortedKeys() throws {
+        @Test func writeIndentationTwoSpacesWithSortedKeys() throws {
             let dict: NSDictionary = ["b": 2, "a": 1]
             let data = try YYJSONSerialization.data(
                 withJSONObject: dict,
-                options: [.prettyPrintedTwoSpaces, .sortedKeys]
+                options: [.indentationTwoSpaces, .sortedKeys]
             )
             let json = String(data: data, encoding: .utf8)!
             // Check key order and indentation
@@ -567,11 +567,11 @@ import Testing
             #expect(json.contains("  \"a\""))  // 2-space indent
         }
 
-        @Test func writePrettyPrintedTwoSpacesNestedStructure() throws {
+        @Test func writeIndentationTwoSpacesNestedStructure() throws {
             let dict: NSDictionary = ["outer": ["inner": ["deep": 1]]]
             let data = try YYJSONSerialization.data(
                 withJSONObject: dict,
-                options: [.prettyPrintedTwoSpaces]
+                options: [.indentationTwoSpaces]
             )
             let json = String(data: data, encoding: .utf8)!
             // Verify 2-space indentation at each nesting level

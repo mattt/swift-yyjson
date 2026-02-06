@@ -82,8 +82,8 @@ public struct YYJSONWriteOptions: OptionSet, Sendable {
     /// Write JSON pretty with 4 space indent.
     public static let prettyPrinted = YYJSONWriteOptions(rawValue: YYJSON_WRITE_PRETTY)
 
-    /// Write JSON pretty with 2 space indent.
-    public static let prettyPrintedTwoSpaces = YYJSONWriteOptions(rawValue: YYJSON_WRITE_PRETTY_TWO_SPACES)
+    /// Write JSON pretty with 2 space indent (implies `prettyPrinted`).
+    public static let indentationTwoSpaces = YYJSONWriteOptions(rawValue: YYJSON_WRITE_PRETTY_TWO_SPACES)
 
     /// Escape unicode as `\uXXXX`, making the output ASCII only.
     public static let escapeUnicode = YYJSONWriteOptions(rawValue: YYJSON_WRITE_ESCAPE_UNICODE)

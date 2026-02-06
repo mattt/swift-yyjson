@@ -55,8 +55,8 @@ public enum YYJSONSerialization {
         public static let withoutEscapingSlashes = WritingOptions(rawValue: 1 << 3)
 
         /// Specifies that the output uses white space and 2-space indentation.
-        /// This flag overrides `prettyPrinted` if both are set.
-        public static let prettyPrintedTwoSpaces = WritingOptions(rawValue: 1 << 4)
+        /// This configures `prettyPrinted` to use 2-space indentation.
+        public static let indentationTwoSpaces = WritingOptions(rawValue: 1 << 4)
 
         /// Escape non-ASCII characters in string values as `\uXXXX`, making the output ASCII only.
         /// Scalars outside the BMP are emitted as surrogate pairs.
@@ -152,7 +152,7 @@ public enum YYJSONSerialization {
             var flags: yyjson_write_flag = 0
 
             // Pretty printing: 2-space overrides 4-space
-            if options.contains(.prettyPrintedTwoSpaces) {
+            if options.contains(.indentationTwoSpaces) {
                 flags |= YYJSON_WRITE_PRETTY_TWO_SPACES
             } else if options.contains(.prettyPrinted) {
                 flags |= YYJSON_WRITE_PRETTY
@@ -261,8 +261,8 @@ public enum YYJSONSerialization {
             }
 
             var writeOptions: YYJSONWriteOptions = []
-            if options.contains(.prettyPrintedTwoSpaces) {
-                writeOptions.insert(.prettyPrintedTwoSpaces)
+            if options.contains(.indentationTwoSpaces) {
+                writeOptions.insert(.indentationTwoSpaces)
             } else if options.contains(.prettyPrinted) {
                 writeOptions.insert(.prettyPrinted)
             }
