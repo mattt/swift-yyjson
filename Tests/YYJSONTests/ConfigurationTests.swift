@@ -167,9 +167,9 @@ import Testing
             #expect(json.contains("    "))
         }
 
-        @Test func prettyPrintedTwoSpacesOption() throws {
+        @Test func indentationTwoSpacesOption() throws {
             var encoder = YYJSONEncoder()
-            encoder.writeOptions = .prettyPrintedTwoSpaces
+            encoder.writeOptions = .indentationTwoSpaces
 
             struct Simple: Codable {
                 let key: String

@@ -300,10 +300,10 @@ if let dict = object as? [String: Any] {
 Configure output formatting with `WritingOptions`:
 
 ```swift
-// 2-space indentation (useful for Xcode asset catalogs)
+// Pretty printing with 2-space indent (useful for Xcode asset catalogs)
 let data = try YYJSONSerialization.data(
     withJSONObject: dict,
-    options: [.prettyPrintedTwoSpaces, .sortedKeys]
+    options: [.indentationTwoSpaces, .sortedKeys]
 )
 
 // ASCII-only output with trailing newline
@@ -319,7 +319,7 @@ Available writing options:
 - `.prettyPrinted` — Pretty print with 4-space indent
 - `.sortedKeys` — Sort dictionary keys lexicographically
 - `.withoutEscapingSlashes` — Don't escape `/` as `\/`
-- `.prettyPrintedTwoSpaces` — Pretty print with 2-space indent (overrides `.prettyPrinted`)
+- `.indentationTwoSpaces` — Configure pretty printing to use 2-space indent (implies `.prettyPrinted`)
 - `.escapeUnicode` — Escape non-ASCII characters as `\uXXXX`
 - `.newlineAtEnd` — Add trailing newline `\n`
 
@@ -365,7 +365,7 @@ encoder.writeOptions = [.prettyPrinted, .escapeSlashes]
 Available options:
 
 - `.prettyPrinted` — Pretty print with 4-space indent
-- `.prettyPrintedTwoSpaces` — Pretty print with 2-space indent
+- `.indentationTwoSpaces` — Pretty print with 2-space indent (implies `.prettyPrinted`)
 - `.escapeUnicode` — Escape non-ASCII as `\uXXXX`
 - `.escapeSlashes` — Escape `/` as `\/`
 - `.allowInvalidUnicode` — Allow invalid unicode when encoding
