@@ -220,6 +220,33 @@ import Testing
                 #expect(json == "null")
             }
 
+            @Test func allowInfAndNaNNaNOption() throws {
+                var encoder = YYJSONEncoder()
+                encoder.writeOptions = .allowInfAndNaN
+
+                let data = try encoder.encode(Double.nan)
+                let json = String(data: data, encoding: .utf8)!
+                #expect(json.contains("NaN") || json.contains("nan"))
+            }
+
+            @Test func infAndNaNAsNullNaNOption() throws {
+                var encoder = YYJSONEncoder()
+                encoder.writeOptions = .infAndNaNAsNull
+
+                let data = try encoder.encode(Double.nan)
+                let json = String(data: data, encoding: .utf8)!
+                #expect(json == "null")
+            }
+
+            @Test func infAndNaNAsNullOverridesAllowInfAndNaN() throws {
+                var encoder = YYJSONEncoder()
+                encoder.writeOptions = [.allowInfAndNaN, .infAndNaNAsNull]
+
+                let data = try encoder.encode(Double.infinity)
+                let json = String(data: data, encoding: .utf8)!
+                #expect(json == "null")
+            }
+
         #endif  // !YYJSON_DISABLE_NON_STANDARD
 
         @Test func newlineAtEndOption() throws {

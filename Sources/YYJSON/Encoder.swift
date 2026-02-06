@@ -58,7 +58,8 @@ import Foundation
                 codingPath: [],
                 userInfo: userInfo,
                 dateEncodingStrategy: dateEncodingStrategy,
-                dataEncodingStrategy: dataEncodingStrategy
+                dataEncodingStrategy: dataEncodingStrategy,
+                writeOptions: writeOptions
             )
 
             try value.encode(to: encoder)
@@ -135,6 +136,7 @@ import Foundation
         let userInfo: [CodingUserInfoKey: Any]
         let dateEncodingStrategy: DateEncodingStrategy
         let dataEncodingStrategy: DataEncodingStrategy
+        let writeOptions: YYJSONWriteOptions
 
         init(
             doc: UnsafeMutablePointer<yyjson_mut_doc>,
@@ -142,7 +144,8 @@ import Foundation
             codingPath: [CodingKey] = [],
             userInfo: [CodingUserInfoKey: Any] = [:],
             dateEncodingStrategy: DateEncodingStrategy = .deferredToDate,
-            dataEncodingStrategy: DataEncodingStrategy = .base64
+            dataEncodingStrategy: DataEncodingStrategy = .base64,
+            writeOptions: YYJSONWriteOptions = .default
         ) {
             self.doc = doc
             self.value = value
@@ -150,6 +153,7 @@ import Foundation
             self.userInfo = userInfo
             self.dateEncodingStrategy = dateEncodingStrategy
             self.dataEncodingStrategy = dataEncodingStrategy
+            self.writeOptions = writeOptions
         }
 
         func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key: CodingKey {
@@ -187,6 +191,15 @@ import Foundation
                 dateEncodingStrategy: dateEncodingStrategy,
                 dataEncodingStrategy: dataEncodingStrategy
             )
+        }
+
+        func numberValue(_ value: Double) -> UnsafeMutablePointer<yyjson_mut_val> {
+            #if !YYJSON_DISABLE_NON_STANDARD
+                if !value.isFinite && writeOptions.contains(.infAndNaNAsNull) {
+                    return yyjson_mut_null(doc)
+                }
+            #endif
+            return yyjson_mut_real(doc, value)
         }
     }
 
@@ -248,7 +261,7 @@ import Foundation
 
         mutating func encode(_ value: Double, forKey key: Key) throws {
             guard let obj = self.value else { return }
-            let numVal = yyjson_mut_real(doc, value)
+            let numVal = encoder.numberValue(value)
             let keyVal = yyFromString(key.stringValue, in: doc)
             _ = yyjson_mut_obj_put(obj, keyVal, numVal)
         }
@@ -332,7 +345,8 @@ import Foundation
                 codingPath: codingPath + [key],
                 userInfo: userInfo,
                 dateEncodingStrategy: dateEncodingStrategy,
-                dataEncodingStrategy: dataEncodingStrategy
+                dataEncodingStrategy: dataEncodingStrategy,
+                writeOptions: encoder.writeOptions
             )
             let encodedValue = try encodeValue(value, using: encoder)
             let keyVal = yyFromString(key.stringValue, in: doc)
@@ -349,7 +363,8 @@ import Foundation
                     codingPath: codingPath + [key],
                     userInfo: userInfo,
                     dateEncodingStrategy: dateEncodingStrategy,
-                    dataEncodingStrategy: dataEncodingStrategy
+                    dataEncodingStrategy: dataEncodingStrategy,
+                    writeOptions: encoder.writeOptions
                 )
                 return encoder.container(keyedBy: type)
             }
@@ -362,7 +377,8 @@ import Foundation
                 codingPath: codingPath + [key],
                 userInfo: userInfo,
                 dateEncodingStrategy: dateEncodingStrategy,
-                dataEncodingStrategy: dataEncodingStrategy
+                dataEncodingStrategy: dataEncodingStrategy,
+                writeOptions: encoder.writeOptions
             )
             return encoder.container(keyedBy: type)
         }
@@ -375,7 +391,8 @@ import Foundation
                     codingPath: codingPath + [key],
                     userInfo: userInfo,
                     dateEncodingStrategy: dateEncodingStrategy,
-                    dataEncodingStrategy: dataEncodingStrategy
+                    dataEncodingStrategy: dataEncodingStrategy,
+                    writeOptions: encoder.writeOptions
                 )
                 return nestedEncoder.unkeyedContainer()
             }
@@ -388,7 +405,8 @@ import Foundation
                 codingPath: codingPath + [key],
                 userInfo: userInfo,
                 dateEncodingStrategy: dateEncodingStrategy,
-                dataEncodingStrategy: dataEncodingStrategy
+                dataEncodingStrategy: dataEncodingStrategy,
+                writeOptions: encoder.writeOptions
             )
             return _YYUnkeyedEncodingContainer(
                 doc: doc,
@@ -408,7 +426,8 @@ import Foundation
                 codingPath: codingPath,
                 userInfo: userInfo,
                 dateEncodingStrategy: dateEncodingStrategy,
-                dataEncodingStrategy: dataEncodingStrategy
+                dataEncodingStrategy: dataEncodingStrategy,
+                writeOptions: encoder.writeOptions
             )
         }
 
@@ -420,7 +439,8 @@ import Foundation
                     codingPath: codingPath + [key],
                     userInfo: userInfo,
                     dateEncodingStrategy: dateEncodingStrategy,
-                    dataEncodingStrategy: dataEncodingStrategy
+                    dataEncodingStrategy: dataEncodingStrategy,
+                    writeOptions: encoder.writeOptions
                 )
             }
             let nestedObj = yyjson_mut_obj(doc)
@@ -432,7 +452,8 @@ import Foundation
                 codingPath: codingPath + [key],
                 userInfo: userInfo,
                 dateEncodingStrategy: dateEncodingStrategy,
-                dataEncodingStrategy: dataEncodingStrategy
+                dataEncodingStrategy: dataEncodingStrategy,
+                writeOptions: encoder.writeOptions
             )
         }
 
@@ -447,7 +468,8 @@ import Foundation
                     codingPath: codingPath,
                     userInfo: userInfo,
                     dateEncodingStrategy: dateEncodingStrategy,
-                    dataEncodingStrategy: dataEncodingStrategy
+                    dataEncodingStrategy: dataEncodingStrategy,
+                    writeOptions: encoder.writeOptions
                 )
                 try date.encode(to: encoder)
                 guard let val = encoder.value else {
@@ -481,7 +503,8 @@ import Foundation
                     codingPath: codingPath,
                     userInfo: userInfo,
                     dateEncodingStrategy: dateEncodingStrategy,
-                    dataEncodingStrategy: dataEncodingStrategy
+                    dataEncodingStrategy: dataEncodingStrategy,
+                    writeOptions: encoder.writeOptions
                 )
                 try closure(date, encoder)
                 guard let val = encoder.value else {
@@ -509,7 +532,8 @@ import Foundation
                     codingPath: codingPath,
                     userInfo: userInfo,
                     dateEncodingStrategy: dateEncodingStrategy,
-                    dataEncodingStrategy: dataEncodingStrategy
+                    dataEncodingStrategy: dataEncodingStrategy,
+                    writeOptions: encoder.writeOptions
                 )
                 try data.encode(to: encoder)
                 guard let val = encoder.value else {
@@ -527,7 +551,8 @@ import Foundation
                     codingPath: codingPath,
                     userInfo: userInfo,
                     dateEncodingStrategy: dateEncodingStrategy,
-                    dataEncodingStrategy: dataEncodingStrategy
+                    dataEncodingStrategy: dataEncodingStrategy,
+                    writeOptions: encoder.writeOptions
                 )
                 try closure(data, encoder)
                 guard let val = encoder.value else {
@@ -612,7 +637,7 @@ import Foundation
 
         mutating func encode(_ value: Double) throws {
             guard let arr = self.value else { return }
-            let numVal = yyjson_mut_real(doc, value)
+            let numVal = encoder.numberValue(value)
             _ = yyjson_mut_arr_append(arr, numVal)
         }
 
@@ -689,7 +714,8 @@ import Foundation
                 codingPath: codingPath + [AnyCodingKey(index: count)],
                 userInfo: userInfo,
                 dateEncodingStrategy: dateEncodingStrategy,
-                dataEncodingStrategy: dataEncodingStrategy
+                dataEncodingStrategy: dataEncodingStrategy,
+                writeOptions: encoder.writeOptions
             )
             let encodedValue = try encodeValue(value, using: encoder)
             _ = yyjson_mut_arr_append(arr, encodedValue)
@@ -708,7 +734,8 @@ import Foundation
                 codingPath: codingPath + [AnyCodingKey(index: count)],
                 userInfo: userInfo,
                 dateEncodingStrategy: dateEncodingStrategy,
-                dataEncodingStrategy: dataEncodingStrategy
+                dataEncodingStrategy: dataEncodingStrategy,
+                writeOptions: encoder.writeOptions
             )
             return encoder.container(keyedBy: type)
         }
@@ -724,7 +751,8 @@ import Foundation
                 codingPath: codingPath + [AnyCodingKey(index: count)],
                 userInfo: userInfo,
                 dateEncodingStrategy: dateEncodingStrategy,
-                dataEncodingStrategy: dataEncodingStrategy
+                dataEncodingStrategy: dataEncodingStrategy,
+                writeOptions: encoder.writeOptions
             )
             return _YYUnkeyedEncodingContainer(
                 doc: doc,
@@ -744,7 +772,8 @@ import Foundation
                 codingPath: codingPath,
                 userInfo: userInfo,
                 dateEncodingStrategy: dateEncodingStrategy,
-                dataEncodingStrategy: dataEncodingStrategy
+                dataEncodingStrategy: dataEncodingStrategy,
+                writeOptions: encoder.writeOptions
             )
         }
 
@@ -759,7 +788,8 @@ import Foundation
                     codingPath: codingPath,
                     userInfo: userInfo,
                     dateEncodingStrategy: dateEncodingStrategy,
-                    dataEncodingStrategy: dataEncodingStrategy
+                    dataEncodingStrategy: dataEncodingStrategy,
+                    writeOptions: encoder.writeOptions
                 )
                 try date.encode(to: encoder)
                 guard let val = encoder.value else {
@@ -793,7 +823,8 @@ import Foundation
                     codingPath: codingPath,
                     userInfo: userInfo,
                     dateEncodingStrategy: dateEncodingStrategy,
-                    dataEncodingStrategy: dataEncodingStrategy
+                    dataEncodingStrategy: dataEncodingStrategy,
+                    writeOptions: encoder.writeOptions
                 )
                 try closure(date, encoder)
                 guard let val = encoder.value else {
@@ -821,7 +852,8 @@ import Foundation
                     codingPath: codingPath,
                     userInfo: userInfo,
                     dateEncodingStrategy: dateEncodingStrategy,
-                    dataEncodingStrategy: dataEncodingStrategy
+                    dataEncodingStrategy: dataEncodingStrategy,
+                    writeOptions: encoder.writeOptions
                 )
                 try data.encode(to: encoder)
                 guard let val = encoder.value else {
@@ -839,7 +871,8 @@ import Foundation
                     codingPath: codingPath,
                     userInfo: userInfo,
                     dateEncodingStrategy: dateEncodingStrategy,
-                    dataEncodingStrategy: dataEncodingStrategy
+                    dataEncodingStrategy: dataEncodingStrategy,
+                    writeOptions: encoder.writeOptions
                 )
                 try closure(data, encoder)
                 guard let val = encoder.value else {
@@ -910,7 +943,7 @@ import Foundation
         }
 
         mutating func encode(_ value: Double) throws {
-            self.value = yyjson_mut_real(doc, value)
+            self.value = encoder.numberValue(value)
             encoder.value = self.value
         }
 
@@ -981,7 +1014,8 @@ import Foundation
                 codingPath: codingPath,
                 userInfo: userInfo,
                 dateEncodingStrategy: dateEncodingStrategy,
-                dataEncodingStrategy: dataEncodingStrategy
+                dataEncodingStrategy: dataEncodingStrategy,
+                writeOptions: encoder.writeOptions
             )
             try value.encode(to: nestedEncoder)
             self.value = nestedEncoder.value
@@ -997,7 +1031,8 @@ import Foundation
                     codingPath: codingPath,
                     userInfo: userInfo,
                     dateEncodingStrategy: dateEncodingStrategy,
-                    dataEncodingStrategy: dataEncodingStrategy
+                    dataEncodingStrategy: dataEncodingStrategy,
+                    writeOptions: encoder.writeOptions
                 )
                 try date.encode(to: nestedEncoder)
                 guard let val = nestedEncoder.value else {
@@ -1031,7 +1066,8 @@ import Foundation
                     codingPath: codingPath,
                     userInfo: userInfo,
                     dateEncodingStrategy: dateEncodingStrategy,
-                    dataEncodingStrategy: dataEncodingStrategy
+                    dataEncodingStrategy: dataEncodingStrategy,
+                    writeOptions: encoder.writeOptions
                 )
                 try closure(date, nestedEncoder)
                 guard let val = nestedEncoder.value else {
@@ -1057,7 +1093,8 @@ import Foundation
                     codingPath: codingPath,
                     userInfo: userInfo,
                     dateEncodingStrategy: dateEncodingStrategy,
-                    dataEncodingStrategy: dataEncodingStrategy
+                    dataEncodingStrategy: dataEncodingStrategy,
+                    writeOptions: encoder.writeOptions
                 )
                 try data.encode(to: nestedEncoder)
                 guard let val = nestedEncoder.value else {
@@ -1075,7 +1112,8 @@ import Foundation
                     codingPath: codingPath,
                     userInfo: userInfo,
                     dateEncodingStrategy: dateEncodingStrategy,
-                    dataEncodingStrategy: dataEncodingStrategy
+                    dataEncodingStrategy: dataEncodingStrategy,
+                    writeOptions: encoder.writeOptions
                 )
                 try closure(data, nestedEncoder)
                 guard let val = nestedEncoder.value else {
