@@ -1,6 +1,11 @@
 import Cyyjson
 import Foundation
 
+/// Locale used to parse JSON numbers into `Decimal`. JSON numbers always use
+/// `.` as the decimal separator regardless of the host's user locale, so we
+/// pin parsing to POSIX to avoid mis-decoding under locales that use `,`.
+private let yyPOSIXLocale = Locale(identifier: "en_US_POSIX")
+
 /// An object that converts between JSON and the equivalent Foundation objects.
 /// This provides a drop-in replacement for Foundation's JSONSerialization using yyjson.
 public enum YYJSONSerialization {
@@ -445,7 +450,7 @@ public enum YYJSONSerialization {
                 if let uintVal = UInt64(text) {
                     return NSNumber(value: uintVal)
                 }
-                if let dec = Decimal(string: text), !dec.isNaN {
+                if let dec = Decimal(string: text, locale: yyPOSIXLocale), !dec.isNaN {
                     return NSDecimalNumber(decimal: dec)
                 }
                 if let dbl = Double(text), dbl.isFinite {

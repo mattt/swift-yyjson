@@ -5,6 +5,11 @@ import Foundation
 
     // MARK: - Helper Functions
 
+    /// Locale used to parse JSON numbers into `Decimal`. JSON numbers always use
+    /// `.` as the decimal separator regardless of the host's user locale, so we
+    /// pin parsing to POSIX to avoid mis-decoding under locales that use `,`.
+    private let yyPOSIXLocale = Locale(identifier: "en_US_POSIX")
+
     @inline(__always)
     func yyToString(_ val: UnsafeMutablePointer<yyjson_val>) -> String {
         let ptr = unsafe_yyjson_get_str(val)!
@@ -949,7 +954,7 @@ import Foundation
                 )
             }
             guard let string = yyNumberText(value),
-                let decimal = Decimal(string: string)
+                let decimal = Decimal(string: string, locale: yyPOSIXLocale)
             else {
                 throw YYJSONError.invalidData(
                     "Could not parse number as Decimal",
@@ -1478,7 +1483,7 @@ import Foundation
                 )
             }
             guard let string = yyNumberText(value),
-                let decimal = Decimal(string: string)
+                let decimal = Decimal(string: string, locale: yyPOSIXLocale)
             else {
                 throw YYJSONError.invalidData(
                     "Could not parse number as Decimal",
@@ -1920,7 +1925,7 @@ import Foundation
                 )
             }
             guard let string = yyNumberText(value),
-                let decimal = Decimal(string: string)
+                let decimal = Decimal(string: string, locale: yyPOSIXLocale)
             else {
                 throw YYJSONError.invalidData(
                     "Could not parse number as Decimal",
