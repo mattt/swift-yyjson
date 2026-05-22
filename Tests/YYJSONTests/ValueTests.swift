@@ -358,6 +358,76 @@ import Testing
         }
     }
 
+    // MARK: - YYJSONValue Decimal / Raw Number Tests
+
+    @Suite("YYJSONValue - Decimal")
+    struct ValueDecimalTests {
+        @Test func decimalFromInteger() throws {
+            let value = try YYJSONValue(string: "42")
+            #expect(value.decimal == Decimal(42))
+        }
+
+        @Test func decimalFromNegativeInteger() throws {
+            let value = try YYJSONValue(string: "-123")
+            #expect(value.decimal == Decimal(-123))
+        }
+
+        @Test func decimalFromFractionWithoutRawIsApproximate() throws {
+            let value = try YYJSONValue(string: "0.1")
+            // Without `.numberAsRaw`, the value passes through `Double` so the
+            // returned `Decimal` reflects the closest binary representation.
+            let approximate = value.decimal
+            #expect(approximate != nil)
+            #expect(abs((approximate! as NSDecimalNumber).doubleValue - 0.1) < 1e-9)
+        }
+
+        @Test func decimalFromRawIsExact() throws {
+            let value = try YYJSONValue(string: "0.1", options: .numberAsRaw)
+            #expect(value.decimal == Decimal(string: "0.1"))
+        }
+
+        @Test func decimalPreservesPrecisionAcrossIncrements() throws {
+            var expected = Decimal(string: "0.00")!
+            let step = Decimal(string: "0.01")!
+            while expected <= Decimal(string: "1.00")! {
+                let value = try YYJSONValue(string: expected.description, options: .numberAsRaw)
+                #expect(value.decimal == expected)
+                expected += step
+            }
+        }
+
+        @Test func decimalFromBigIntegerWithRaw() throws {
+            let big = "99999999999999999999"
+            let value = try YYJSONValue(string: big, options: .numberAsRaw)
+            #expect(value.decimal == Decimal(string: big))
+        }
+
+        @Test func numberStillWorksForRawValues() throws {
+            let value = try YYJSONValue(string: "3.14159", options: .numberAsRaw)
+            #expect(value.number != nil)
+            #expect(abs(value.number! - 3.14159) < 1e-9)
+        }
+
+        @Test func descriptionPreservesRawNumberText() throws {
+            let value = try YYJSONValue(string: "1.0000000000000001", options: .numberAsRaw)
+            #expect(value.description == "1.0000000000000001")
+        }
+
+        @Test func decimalReturnsNilForNonNumber() throws {
+            #expect(try YYJSONValue(string: #""hello""#).decimal == nil)
+            #expect(try YYJSONValue(string: "true").decimal == nil)
+            #expect(try YYJSONValue(string: "null").decimal == nil)
+        }
+
+        @Test func nestedRawNumberAccess() throws {
+            let json = #"{"price": 19.99, "items": [0.1, 0.2, 0.3]}"#
+            let value = try YYJSONValue(string: json, options: .numberAsRaw)
+            #expect(value["price"]?.decimal == Decimal(string: "19.99"))
+            #expect(value["items"]?[0]?.decimal == Decimal(string: "0.1"))
+            #expect(value["items"]?[2]?.decimal == Decimal(string: "0.3"))
+        }
+    }
+
     // MARK: - YYJSONObject Tests
 
     @Suite("YYJSONObject - Direct Access")
