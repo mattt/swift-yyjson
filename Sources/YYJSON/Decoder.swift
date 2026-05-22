@@ -59,24 +59,99 @@ import Foundation
         return yyjson_is_num(val) || yyjson_is_raw(val)
     }
 
-    /// Parses a numeric text into a fixed-width signed integer,
-    /// falling back to a `Double` conversion for fractional or exponential forms.
+    /// Parses a numeric JSON value as `Double` without allocating an intermediate `String`.
+    ///
+    /// For raw values (the common path under `YYJSON_READ_NUMBER_AS_RAW`),
+    /// `strtod` is called directly on yyjson's null-terminated buffer.
+    /// For values stored natively, `yyjson_get_num` returns the parsed result.
     @inline(__always)
-    func yyParseSignedInt<T: FixedWidthInteger & SignedInteger>(_ text: String) -> T? {
-        if let direct = T(text) { return direct }
-        guard let d = Double(text), d.isFinite else { return nil }
-        guard d >= Double(T.min) && d <= Double(T.max) else { return nil }
-        return T(d)
+    func yyParseDouble(_ val: UnsafeMutablePointer<yyjson_val>) -> Double? {
+        if yyjson_is_raw(val) {
+            guard let ptr = unsafe_yyjson_get_raw(val) else { return nil }
+            let len = unsafe_yyjson_get_len(val)
+            var end: UnsafeMutablePointer<CChar>?
+            let d = strtod(ptr, &end)
+            guard let e = end, ptr.distance(to: UnsafePointer(e)) == len else { return nil }
+            return d
+        }
+        if yyjson_is_num(val) {
+            return yyjson_get_num(val)
+        }
+        return nil
     }
 
-    /// Parses a numeric text into a fixed-width unsigned integer,
-    /// falling back to a `Double` conversion for fractional or exponential forms.
+    /// Parses a numeric JSON value as a fixed-width signed integer.
+    ///
+    /// Tries `strtoll` first for plain integer text;
+    /// falls back to a `Double` conversion (range-checked against `T`)
+    /// for fractional or exponential forms, and for integers that overflow `Int64`.
     @inline(__always)
-    func yyParseUnsignedInt<T: FixedWidthInteger & UnsignedInteger>(_ text: String) -> T? {
-        if let direct = T(text) { return direct }
-        guard let d = Double(text), d.isFinite, d >= 0 else { return nil }
-        guard d <= Double(T.max) else { return nil }
-        return T(d)
+    func yyParseSignedInt<T: FixedWidthInteger & SignedInteger>(
+        _ val: UnsafeMutablePointer<yyjson_val>
+    ) -> T? {
+        if yyjson_is_raw(val) {
+            guard let ptr = unsafe_yyjson_get_raw(val) else { return nil }
+            let len = unsafe_yyjson_get_len(val)
+            var iend: UnsafeMutablePointer<CChar>?
+            errno = 0
+            let i = strtoll(ptr, &iend, 10)
+            if errno == 0, let e = iend, ptr.distance(to: UnsafePointer(e)) == len {
+                return T(exactly: i)
+            }
+            var dend: UnsafeMutablePointer<CChar>?
+            let d = strtod(ptr, &dend)
+            guard let de = dend, ptr.distance(to: UnsafePointer(de)) == len,
+                d.isFinite, d >= Double(T.min), d <= Double(T.max)
+            else { return nil }
+            return T(d)
+        }
+        if yyjson_is_num(val) {
+            if yyjson_is_int(val) { return T(exactly: yyjson_get_sint(val)) }
+            let d = yyjson_get_num(val)
+            guard d.isFinite, d >= Double(T.min), d <= Double(T.max) else { return nil }
+            return T(d)
+        }
+        return nil
+    }
+
+    /// Parses a numeric JSON value as a fixed-width unsigned integer.
+    ///
+    /// Tries `strtoull` first for plain integer text;
+    /// falls back to a `Double` conversion (range-checked against `T`)
+    /// for fractional or exponential forms, and for integers that overflow `UInt64`.
+    @inline(__always)
+    func yyParseUnsignedInt<T: FixedWidthInteger & UnsignedInteger>(
+        _ val: UnsafeMutablePointer<yyjson_val>
+    ) -> T? {
+        if yyjson_is_raw(val) {
+            guard let ptr = unsafe_yyjson_get_raw(val) else { return nil }
+            let len = unsafe_yyjson_get_len(val)
+            // Reject explicit negative sign before strtoull silently wraps it.
+            if len > 0, ptr.pointee == 0x2D /* '-' */ { return nil }
+            var iend: UnsafeMutablePointer<CChar>?
+            errno = 0
+            let i = strtoull(ptr, &iend, 10)
+            if errno == 0, let e = iend, ptr.distance(to: UnsafePointer(e)) == len {
+                return T(exactly: i)
+            }
+            var dend: UnsafeMutablePointer<CChar>?
+            let d = strtod(ptr, &dend)
+            guard let de = dend, ptr.distance(to: UnsafePointer(de)) == len,
+                d.isFinite, d >= 0, d <= Double(T.max)
+            else { return nil }
+            return T(d)
+        }
+        if yyjson_is_num(val) {
+            if yyjson_is_int(val) {
+                let s = yyjson_get_sint(val)
+                if s < 0 { return nil }
+                return T(exactly: UInt64(bitPattern: s))
+            }
+            let d = yyjson_get_num(val)
+            guard d.isFinite, d >= 0, d <= Double(T.max) else { return nil }
+            return T(d)
+        }
+        return nil
     }
 
     /// A decoder that decodes JSON data into Swift types using the yyjson library.
@@ -527,7 +602,7 @@ import Foundation
                 if yyjson_is_bool(val) {
                     return yyjson_get_bool(val)
                 }
-                if let text = yyNumberText(val), let num = Double(text) {
+                if let num = yyParseDouble(val) {
                     return num != 0.0
                 }
                 if yyjson_is_str(val) {
@@ -568,7 +643,7 @@ import Foundation
 
         func decode(_ type: Double.Type, forKey key: Key) throws -> Double {
             try decodeValue(forKey: key) { val in
-                if let text = yyNumberText(val), let num = Double(text) {
+                if let num = yyParseDouble(val) {
                     if !num.isFinite {
                         switch nonConformingFloatDecodingStrategy {
                         case .throw:
@@ -616,7 +691,7 @@ import Foundation
 
         func decode(_ type: Int.Type, forKey key: Key) throws -> Int {
             try decodeValue(forKey: key) { val in
-                if let text = yyNumberText(val), let num: Int = yyParseSignedInt(text) {
+                if let num: Int = yyParseSignedInt(val) {
                     return num
                 }
                 if yyjson_is_str(val), let num = Int(yyToString(val)) {
@@ -644,7 +719,7 @@ import Foundation
 
         func decode(_ type: Int64.Type, forKey key: Key) throws -> Int64 {
             try decodeValue(forKey: key) { val in
-                if let text = yyNumberText(val), let num: Int64 = yyParseSignedInt(text) {
+                if let num: Int64 = yyParseSignedInt(val) {
                     return num
                 }
                 if yyjson_is_str(val), let num = Int64(yyToString(val)) {
@@ -660,7 +735,7 @@ import Foundation
 
         func decode(_ type: UInt.Type, forKey key: Key) throws -> UInt {
             try decodeValue(forKey: key) { val in
-                if let text = yyNumberText(val), let num: UInt = yyParseUnsignedInt(text) {
+                if let num: UInt = yyParseUnsignedInt(val) {
                     return num
                 }
                 if yyjson_is_str(val), let num = UInt(yyToString(val)) {
@@ -688,7 +763,7 @@ import Foundation
 
         func decode(_ type: UInt64.Type, forKey key: Key) throws -> UInt64 {
             try decodeValue(forKey: key) { val in
-                if let text = yyNumberText(val), let num: UInt64 = yyParseUnsignedInt(text) {
+                if let num: UInt64 = yyParseUnsignedInt(val) {
                     return num
                 }
                 if yyjson_is_str(val), let num = UInt64(yyToString(val)) {
@@ -898,7 +973,7 @@ import Foundation
             from value: UnsafeMutablePointer<yyjson_val>,
             path: String
         ) throws -> T where T: BinaryFloatingPoint {
-            if let text = yyNumberText(value), let num = Double(text) {
+            if let num = yyParseDouble(value) {
                 if !num.isFinite {
                     switch nonConformingFloatDecodingStrategy {
                     case .throw:
@@ -1109,7 +1184,7 @@ import Foundation
                 throw YYJSONError.missingValue(path: pathString)
             }
             currentIndex += 1
-            if let text = yyNumberText(val), let num = Double(text) {
+            if let num = yyParseDouble(val) {
                 if !num.isFinite {
                     switch nonConformingFloatDecodingStrategy {
                     case .throw:
@@ -1159,7 +1234,7 @@ import Foundation
                 throw YYJSONError.missingValue(path: pathString)
             }
             currentIndex += 1
-            if let text = yyNumberText(val), let num: Int = yyParseSignedInt(text) {
+            if let num: Int = yyParseSignedInt(val) {
                 return num
             }
             throw YYJSONError.typeMismatch(
@@ -1186,7 +1261,7 @@ import Foundation
                 throw YYJSONError.missingValue(path: pathString)
             }
             currentIndex += 1
-            if let text = yyNumberText(val), let num: Int64 = yyParseSignedInt(text) {
+            if let num: Int64 = yyParseSignedInt(val) {
                 return num
             }
             throw YYJSONError.typeMismatch(
@@ -1201,7 +1276,7 @@ import Foundation
                 throw YYJSONError.missingValue(path: pathString)
             }
             currentIndex += 1
-            if let text = yyNumberText(val), let num: UInt = yyParseUnsignedInt(text) {
+            if let num: UInt = yyParseUnsignedInt(val) {
                 return num
             }
             throw YYJSONError.typeMismatch(
@@ -1228,7 +1303,7 @@ import Foundation
                 throw YYJSONError.missingValue(path: pathString)
             }
             currentIndex += 1
-            if let text = yyNumberText(val), let num: UInt64 = yyParseUnsignedInt(text) {
+            if let num: UInt64 = yyParseUnsignedInt(val) {
                 return num
             }
             throw YYJSONError.typeMismatch(
@@ -1556,7 +1631,7 @@ import Foundation
             guard let val = value else {
                 throw YYJSONError.missingValue(path: pathString)
             }
-            if let text = yyNumberText(val), let num = Double(text) {
+            if let num = yyParseDouble(val) {
                 if !num.isFinite {
                     switch nonConformingFloatDecodingStrategy {
                     case .throw:
@@ -1605,7 +1680,7 @@ import Foundation
             guard let val = value else {
                 throw YYJSONError.missingValue(path: pathString)
             }
-            if let text = yyNumberText(val), let num: Int = yyParseSignedInt(text) {
+            if let num: Int = yyParseSignedInt(val) {
                 return num
             }
             throw YYJSONError.typeMismatch(
@@ -1631,7 +1706,7 @@ import Foundation
             guard let val = value else {
                 throw YYJSONError.missingValue(path: pathString)
             }
-            if let text = yyNumberText(val), let num: Int64 = yyParseSignedInt(text) {
+            if let num: Int64 = yyParseSignedInt(val) {
                 return num
             }
             throw YYJSONError.typeMismatch(
@@ -1645,7 +1720,7 @@ import Foundation
             guard let val = value else {
                 throw YYJSONError.missingValue(path: pathString)
             }
-            if let text = yyNumberText(val), let num: UInt = yyParseUnsignedInt(text) {
+            if let num: UInt = yyParseUnsignedInt(val) {
                 return num
             }
             throw YYJSONError.typeMismatch(
@@ -1671,7 +1746,7 @@ import Foundation
             guard let val = value else {
                 throw YYJSONError.missingValue(path: pathString)
             }
-            if let text = yyNumberText(val), let num: UInt64 = yyParseUnsignedInt(text) {
+            if let num: UInt64 = yyParseUnsignedInt(val) {
                 return num
             }
             throw YYJSONError.typeMismatch(
