@@ -82,9 +82,13 @@ import Foundation
 
     /// Parses a numeric JSON value as a fixed-width signed integer.
     ///
-    /// Tries `strtoll` first for plain integer text;
-    /// falls back to a `Double` conversion (range-checked against `T`)
-    /// for fractional or exponential forms, and for integers that overflow `Int64`.
+    /// Tries `strtoll` first for plain integer text (auto-detecting `0x` hex
+    /// literals admitted by JSON5's extended-number mode); falls back to a
+    /// `Double` conversion for fractional or exponential forms, and for integers
+    /// that overflow `Int64`. Range checking uses `T(exactly:)` against the
+    /// truncated `Double` to avoid the rounding pitfalls of comparing against
+    /// `Double(T.min)`/`Double(T.max)`, which are not exactly representable for
+    /// 64-bit integer bounds.
     @inline(__always)
     func yyParseSignedInt<T: FixedWidthInteger & SignedInteger>(
         _ val: UnsafeMutablePointer<yyjson_val>
@@ -94,31 +98,34 @@ import Foundation
             let len = unsafe_yyjson_get_len(val)
             var iend: UnsafeMutablePointer<CChar>?
             errno = 0
-            let i = strtoll(ptr, &iend, 10)
+            let i = strtoll(ptr, &iend, 0)
             if errno == 0, let e = iend, ptr.distance(to: UnsafePointer(e)) == len {
                 return T(exactly: i)
             }
             var dend: UnsafeMutablePointer<CChar>?
             let d = strtod(ptr, &dend)
             guard let de = dend, ptr.distance(to: UnsafePointer(de)) == len,
-                d.isFinite, d >= Double(T.min), d <= Double(T.max)
+                d.isFinite
             else { return nil }
-            return T(d)
+            return T(exactly: d.rounded(.towardZero))
         }
         if yyjson_is_num(val) {
             if yyjson_is_int(val) { return T(exactly: yyjson_get_sint(val)) }
             let d = yyjson_get_num(val)
-            guard d.isFinite, d >= Double(T.min), d <= Double(T.max) else { return nil }
-            return T(d)
+            guard d.isFinite else { return nil }
+            return T(exactly: d.rounded(.towardZero))
         }
         return nil
     }
 
     /// Parses a numeric JSON value as a fixed-width unsigned integer.
     ///
-    /// Tries `strtoull` first for plain integer text;
-    /// falls back to a `Double` conversion (range-checked against `T`)
-    /// for fractional or exponential forms, and for integers that overflow `UInt64`.
+    /// Tries `strtoull` first for plain integer text (auto-detecting `0x` hex
+    /// literals admitted by JSON5's extended-number mode); falls back to a
+    /// `Double` conversion for fractional or exponential forms, and for integers
+    /// that overflow `UInt64`. Range checking uses `T(exactly:)` against the
+    /// truncated `Double` to avoid the rounding pitfalls of comparing against
+    /// `Double(T.max)` for 64-bit unsigned bounds.
     @inline(__always)
     func yyParseUnsignedInt<T: FixedWidthInteger & UnsignedInteger>(
         _ val: UnsafeMutablePointer<yyjson_val>
@@ -130,16 +137,16 @@ import Foundation
             if len > 0, ptr.pointee == 0x2D /* '-' */ { return nil }
             var iend: UnsafeMutablePointer<CChar>?
             errno = 0
-            let i = strtoull(ptr, &iend, 10)
+            let i = strtoull(ptr, &iend, 0)
             if errno == 0, let e = iend, ptr.distance(to: UnsafePointer(e)) == len {
                 return T(exactly: i)
             }
             var dend: UnsafeMutablePointer<CChar>?
             let d = strtod(ptr, &dend)
             guard let de = dend, ptr.distance(to: UnsafePointer(de)) == len,
-                d.isFinite, d >= 0, d <= Double(T.max)
+                d.isFinite, d >= 0
             else { return nil }
-            return T(d)
+            return T(exactly: d.rounded(.towardZero))
         }
         if yyjson_is_num(val) {
             if yyjson_is_int(val) {
@@ -148,8 +155,8 @@ import Foundation
                 return T(exactly: UInt64(bitPattern: s))
             }
             let d = yyjson_get_num(val)
-            guard d.isFinite, d >= 0, d <= Double(T.max) else { return nil }
-            return T(d)
+            guard d.isFinite, d >= 0 else { return nil }
+            return T(exactly: d.rounded(.towardZero))
         }
         return nil
     }
