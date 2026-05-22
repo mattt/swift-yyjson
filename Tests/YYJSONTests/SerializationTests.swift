@@ -144,6 +144,72 @@ import Testing
         }
     }
 
+    // MARK: - Numeric Precision Tests
+
+    @Suite("YYJSONSerialization - Number Precision")
+    struct SerializationNumberPrecisionTests {
+        @Test func fractionalNumbersDecodeAsNSDecimalNumber() throws {
+            let json = #"{"price": 0.1}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONSerialization.jsonObject(with: data) as? NSDictionary
+            let value = result?["price"]
+            #expect(value is NSDecimalNumber)
+            #expect((value as? NSDecimalNumber)?.decimalValue == Decimal(string: "0.1"))
+        }
+
+        @Test func fractionalDecodingPreservesPrecisionAcrossIncrements() throws {
+            var expected = Decimal(string: "0.00")!
+            let step = Decimal(string: "0.01")!
+            while expected <= Decimal(string: "1.00")! {
+                let json = "{\"v\":\(expected)}"
+                let data = json.data(using: .utf8)!
+                let result = try YYJSONSerialization.jsonObject(with: data) as? NSDictionary
+                // Whole-number values come back as integer-typed NSNumber; fractional
+                // values come back as NSDecimalNumber. Both bridge to NSNumber, whose
+                // `decimalValue` recovers the original Decimal losslessly.
+                #expect((result?["v"] as? NSNumber)?.decimalValue == expected)
+                expected += step
+            }
+        }
+
+        @Test func integersStillDecodeAsNSNumberInt() throws {
+            let json = #"{"answer": 42, "negative": -7}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONSerialization.jsonObject(with: data) as? NSDictionary
+            #expect(result?["answer"] as? Int == 42)
+            #expect(result?["negative"] as? Int == -7)
+        }
+
+        @Test func bigIntegersBeyondInt64DecodeAsNSDecimalNumber() throws {
+            let big = "99999999999999999999"
+            let json = "{\"big\":\(big)}"
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONSerialization.jsonObject(with: data) as? NSDictionary
+            let value = result?["big"]
+            #expect(value is NSDecimalNumber)
+            #expect((value as? NSDecimalNumber)?.decimalValue == Decimal(string: big))
+        }
+
+        @Test func unsignedIntegersBeyondInt64DecodeAsNSNumber() throws {
+            // 2^63 fits in UInt64 but not in Int64.
+            let json = "{\"v\":9223372036854775808}"
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONSerialization.jsonObject(with: data) as? NSDictionary
+            let value = result?["v"]
+            #expect(value is NSNumber)
+            #expect((value as? NSNumber)?.uint64Value == 9_223_372_036_854_775_808)
+        }
+
+        @Test func decimalNumberBridgesBackToDouble() throws {
+            let json = #"{"x": 3.14159265358979}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONSerialization.jsonObject(with: data) as? NSDictionary
+            let value = result?["x"] as? NSNumber
+            #expect(value != nil)
+            #expect(abs(value!.doubleValue - 3.14159265358979) < 1e-13)
+        }
+    }
+
 #endif  // !YYJSON_DISABLE_READER
 
 // MARK: - JSONObject Writing Tests

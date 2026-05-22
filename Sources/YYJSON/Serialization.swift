@@ -94,6 +94,10 @@ public enum YYJSONSerialization {
                     readOptions.insert(.json5)
                 }
             #endif
+            // Preserve the original text of every JSON number so that fractional values
+            // (e.g. `0.1`) round-trip exactly through `NSDecimalNumber`, matching the
+            // precision contract of Foundation's `JSONSerialization`.
+            readOptions.insert(.numberAsRaw)
 
             let document = try YYDocument(data: data, options: readOptions)
             guard let root = document.root else {
@@ -427,6 +431,26 @@ public enum YYJSONSerialization {
 
             if let b = bool {
                 return NSNumber(value: b)
+            }
+
+            // Numbers parsed with `YYJSON_READ_NUMBER_AS_RAW` arrive as raw text.
+            // Map them to the most precise NSNumber representation:
+            // signed/unsigned 64-bit integers when possible, then `NSDecimalNumber`
+            // for fractional or oversized integer values, and finally `Double` as a
+            // last resort for values outside `Decimal`'s representable range.
+            if let raw = rawValue, yyjson_is_raw(raw), let text = yyRawText(raw) {
+                if let intVal = Int64(text) {
+                    return NSNumber(value: intVal)
+                }
+                if let uintVal = UInt64(text) {
+                    return NSNumber(value: uintVal)
+                }
+                if let dec = Decimal(string: text), !dec.isNaN {
+                    return NSDecimalNumber(decimal: dec)
+                }
+                if let dbl = Double(text), dbl.isFinite {
+                    return NSNumber(value: dbl)
+                }
             }
 
             if let n = number {
