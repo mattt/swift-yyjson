@@ -675,6 +675,341 @@ import Testing
         }
     }
 
+    // MARK: - Decimal Decoding Tests
+
+    @Suite("YYJSONDecoder - Decimal")
+    struct DecoderDecimalTests {
+        struct DecimalContainer: Codable, Equatable {
+            let value: Decimal
+        }
+
+        @Test func decodeDecimalFromInteger() throws {
+            let json = #"{"value": 42}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            #expect(result.value == Decimal(42))
+        }
+
+        @Test func decodeDecimalFromNegativeInteger() throws {
+            let json = #"{"value": -7}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            #expect(result.value == Decimal(-7))
+        }
+
+        @Test func decodeDecimalFromFraction() throws {
+            let json = #"{"value": 0.01}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            #expect(result.value == Decimal(string: "0.01"))
+        }
+
+        @Test func decodeDecimalPreservesPrecisionAcrossIncrements() throws {
+            let decoder = YYJSONDecoder()
+            var decimal = Decimal(string: "0.00")!
+            let limit = Decimal(string: "99.99")!
+            let step = Decimal(string: "0.01")!
+            while decimal <= limit {
+                let jsonData = Data("{\"value\":\(decimal)}".utf8)
+                let result = try decoder.decode(DecimalContainer.self, from: jsonData)
+                #expect(result.value == decimal)
+                decimal += step
+            }
+        }
+
+        @Test func decodeDecimalFromTopLevelNumber() throws {
+            let data = Data("3.14159".utf8)
+            let result = try YYJSONDecoder().decode(Decimal.self, from: data)
+            #expect(result == Decimal(string: "3.14159"))
+        }
+
+        @Test func decodeDecimalInArray() throws {
+            let json = #"[1.5, 2.5, 3.5]"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONDecoder().decode([Decimal].self, from: data)
+            #expect(
+                result == [
+                    Decimal(string: "1.5")!,
+                    Decimal(string: "2.5")!,
+                    Decimal(string: "3.5")!,
+                ]
+            )
+        }
+
+        @Test func decodeDecimalFromStringThrows() throws {
+            let json = #"{"value": "1.23"}"#
+            let data = json.data(using: .utf8)!
+            #expect(throws: YYJSONError.self) {
+                _ = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            }
+        }
+
+        @Test func decodeDecimalFromZero() throws {
+            let json = #"{"value": 0}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            #expect(result.value == Decimal.zero)
+        }
+
+        @Test func decodeDecimalFromZeroPointZero() throws {
+            let json = #"{"value": 0.00}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            #expect(result.value == Decimal.zero)
+        }
+
+        @Test func decodeDecimalFromNegativeFraction() throws {
+            let json = #"{"value": -3.14}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            #expect(result.value == Decimal(string: "-3.14"))
+        }
+
+        @Test func decodeDecimalFromPositiveExponent() throws {
+            let json = #"{"value": 1.5e3}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            #expect(result.value == Decimal(string: "1500"))
+        }
+
+        @Test func decodeDecimalFromNegativeExponent() throws {
+            let json = #"{"value": 2.5e-2}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            #expect(result.value == Decimal(string: "0.025"))
+        }
+
+        @Test func decodeDecimalFromBoolThrows() throws {
+            let json = #"{"value": true}"#
+            let data = json.data(using: .utf8)!
+            #expect(throws: YYJSONError.self) {
+                _ = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            }
+        }
+
+        @Test func decodeDecimalFromObjectThrows() throws {
+            let json = #"{"value": {}}"#
+            let data = json.data(using: .utf8)!
+            #expect(throws: YYJSONError.self) {
+                _ = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            }
+        }
+
+        @Test func decodeDecimalFromArrayThrows() throws {
+            let json = #"{"value": []}"#
+            let data = json.data(using: .utf8)!
+            #expect(throws: YYJSONError.self) {
+                _ = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            }
+        }
+
+        @Test func decodeDecimalFromNullThrows() throws {
+            let json = #"{"value": null}"#
+            let data = json.data(using: .utf8)!
+            #expect(throws: YYJSONError.self) {
+                _ = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            }
+        }
+
+        @Test func decodeOptionalDecimalFromNull() throws {
+            struct Container: Codable {
+                let value: Decimal?
+            }
+            let json = #"{"value": null}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONDecoder().decode(Container.self, from: data)
+            #expect(result.value == nil)
+        }
+
+        @Test func decodeOptionalDecimalFromMissingKey() throws {
+            struct Container: Codable {
+                let value: Decimal?
+            }
+            let json = #"{}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONDecoder().decode(Container.self, from: data)
+            #expect(result.value == nil)
+        }
+
+        @Test func decodeOptionalDecimalWithValue() throws {
+            struct Container: Codable {
+                let value: Decimal?
+            }
+            let json = #"{"value": 1.5}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONDecoder().decode(Container.self, from: data)
+            #expect(result.value == Decimal(string: "1.5"))
+        }
+
+        @Test func decodeNestedDecimal() throws {
+            struct Inner: Codable, Equatable {
+                let amount: Decimal
+            }
+            struct Outer: Codable, Equatable {
+                let inner: Inner
+            }
+            let json = #"{"inner": {"amount": 99.99}}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONDecoder().decode(Outer.self, from: data)
+            #expect(result.inner.amount == Decimal(string: "99.99"))
+        }
+
+        @Test func decodeDictionaryOfDecimals() throws {
+            let json = #"{"a": 1.5, "b": 2.5, "c": -3.5}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONDecoder().decode([String: Decimal].self, from: data)
+            #expect(
+                result == [
+                    "a": Decimal(string: "1.5")!,
+                    "b": Decimal(string: "2.5")!,
+                    "c": Decimal(string: "-3.5")!,
+                ]
+            )
+        }
+
+        @Test func decodeStructWithMultipleDecimalFields() throws {
+            struct Money: Codable, Equatable {
+                let amount: Decimal
+                let tax: Decimal
+                let total: Decimal
+            }
+            let json = #"{"amount": 100.00, "tax": 8.25, "total": 108.25}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONDecoder().decode(Money.self, from: data)
+            #expect(
+                result
+                    == Money(
+                        amount: Decimal(100),
+                        tax: Decimal(string: "8.25")!,
+                        total: Decimal(string: "108.25")!
+                    )
+            )
+        }
+
+        @Test func decodeDecimalInNestedArray() throws {
+            let json = "[[1.1, 2.2], [3.3, 4.4]]"
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONDecoder().decode([[Decimal]].self, from: data)
+            #expect(
+                result == [
+                    [Decimal(string: "1.1")!, Decimal(string: "2.2")!],
+                    [Decimal(string: "3.3")!, Decimal(string: "4.4")!],
+                ]
+            )
+        }
+
+        @Test func decodeDecimalWithSnakeCaseKey() throws {
+            struct Container: Codable, Equatable {
+                let unitPrice: Decimal
+            }
+            let json = #"{"unit_price": 19.99}"#
+            let data = json.data(using: .utf8)!
+            var decoder = YYJSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            let result = try decoder.decode(Container.self, from: data)
+            #expect(result.unitPrice == Decimal(string: "19.99"))
+        }
+
+        @Test func decodeDecimalReportsPathOnTypeMismatch() throws {
+            struct Container: Codable {
+                let nested: Inner
+                struct Inner: Codable {
+                    let amount: Decimal
+                }
+            }
+            let json = #"{"nested": {"amount": "oops"}}"#
+            let data = json.data(using: .utf8)!
+            do {
+                _ = try YYJSONDecoder().decode(Container.self, from: data)
+                Issue.record("Expected decoding to throw")
+            } catch let error as YYJSONError {
+                #expect(error.path.contains("amount"))
+            }
+        }
+
+        @Test func decodeDecimalInSingleValueContainer() throws {
+            struct Wrapper: Decodable, Equatable {
+                let decimal: Decimal
+                init(from decoder: Decoder) throws {
+                    let container = try decoder.singleValueContainer()
+                    self.decimal = try container.decode(Decimal.self)
+                }
+            }
+            let data = Data("42.5".utf8)
+            let result = try YYJSONDecoder().decode(Wrapper.self, from: data)
+            #expect(result.decimal == Decimal(string: "42.5"))
+        }
+
+        // MARK: - Overflow / Underflow
+
+        @Test func decodeDecimalWithinDecimalRange() throws {
+            // 1e100 fits in both Double and Decimal exponent ranges.
+            let json = #"{"value": 1e100}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            #expect(result.value == Decimal(string: "1e100"))
+        }
+
+        @Test func decodeDecimalOverflowingDecimalRangeThrows() throws {
+            // 1e200 fits in Double but exceeds Decimal's exponent range (-128...127),
+            // so `Decimal(string:)` returns nil and we surface a clear error.
+            let json = #"{"value": 1e200}"#
+            let data = json.data(using: .utf8)!
+            #expect(throws: YYJSONError.self) {
+                _ = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            }
+        }
+
+        @Test func decodeDecimalUnderflowingDecimalRangeThrows() throws {
+            // 1e-200 is non-zero in Double but below Decimal's smallest representable
+            // magnitude, so `Decimal(string:)` returns nil.
+            let json = #"{"value": 1e-200}"#
+            let data = json.data(using: .utf8)!
+            #expect(throws: YYJSONError.self) {
+                _ = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            }
+        }
+
+        @Test func decodeDecimalOverflowingDoubleThrows() throws {
+            // 1e1000 overflows Double; yyjson rejects this as an invalid number
+            // before our Decimal-specific path is reached.
+            let json = #"{"value": 1e1000}"#
+            let data = json.data(using: .utf8)!
+            #expect(throws: YYJSONError.self) {
+                _ = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            }
+        }
+
+        @Test func decodeDecimalUnderflowingDecimalThrows() throws {
+            // 1e-500 is below Decimal's smallest representable magnitude.
+            // The decoder parses the raw text directly rather than collapsing
+            // to zero through a Double conversion, so we surface a clear error.
+            let json = #"{"value": 1e-500}"#
+            let data = json.data(using: .utf8)!
+            #expect(throws: YYJSONError.self) {
+                _ = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            }
+        }
+
+        @Test func decodeIntegerExceedingUInt64MaxPreservesPrecision() throws {
+            // The decoder reads numbers as raw text, so 20+ digit integers that
+            // exceed UInt64 still decode losslessly into Decimal.
+            let json = #"{"value": 99999999999999999999}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            #expect(result.value == Decimal(string: "99999999999999999999"))
+        }
+
+        @Test func decodeDecimalPreservesPrecisionBeyondDouble() throws {
+            // The decoder bypasses Double entirely for Decimal, so fractional
+            // values with more than Double's ~17 significant digits decode exactly.
+            let json = #"{"value": 0.12345678901234567890123456789012345678}"#
+            let data = json.data(using: .utf8)!
+            let result = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
+            #expect(result.value == Decimal(string: "0.12345678901234567890123456789012345678"))
+        }
+    }
+
     // MARK: - Non-Conforming Float Strategy Tests
 
     @Suite("YYJSONDecoder - Non-Conforming Float Strategies")

@@ -1176,4 +1176,244 @@ import Testing
         }
     }
 
+    // MARK: - Decimal Encoding Tests
+
+    @Suite("YYJSONEncoder - Decimal")
+    struct EncoderDecimalTests {
+        struct DecimalContainer: Codable, Equatable {
+            let value: Decimal
+        }
+
+        @Test func encodeDecimalAsJSONNumber() throws {
+            let container = DecimalContainer(value: Decimal(string: "0.01")!)
+            let encoded = try YYJSONEncoder().encode(container)
+            let result = String(data: encoded, encoding: .utf8)!
+            #expect(result == #"{"value":0.01}"#)
+        }
+
+        @Test func encodeDecimalInteger() throws {
+            let container = DecimalContainer(value: Decimal(42))
+            let encoded = try YYJSONEncoder().encode(container)
+            let result = String(data: encoded, encoding: .utf8)!
+            #expect(result == #"{"value":42}"#)
+        }
+
+        @Test func encodeDecimalArray() throws {
+            let values = [
+                Decimal(string: "1.5")!,
+                Decimal(string: "2.5")!,
+                Decimal(string: "-3.75")!,
+            ]
+            let encoded = try YYJSONEncoder().encode(values)
+            let result = String(data: encoded, encoding: .utf8)!
+            #expect(result == "[1.5,2.5,-3.75]")
+        }
+
+        @Test func encodeDecimalAsTopLevelValue() throws {
+            let encoded = try YYJSONEncoder().encode(Decimal(string: "3.14159")!)
+            let result = String(data: encoded, encoding: .utf8)!
+            #expect(result == "3.14159")
+        }
+
+        @Test func roundtripDecimalPreservesPrecision() throws {
+            let encoder = YYJSONEncoder()
+            let decoder = YYJSONDecoder()
+            var decimal = Decimal(string: "0.00")!
+            let limit = Decimal(string: "99.99")!
+            let step = Decimal(string: "0.01")!
+            while decimal <= limit {
+                let container = DecimalContainer(value: decimal)
+                let encoded = try encoder.encode(container)
+                let decoded = try decoder.decode(DecimalContainer.self, from: encoded)
+                #expect(decoded == container)
+                decimal += step
+            }
+        }
+
+        @Test func encodeNegativeDecimal() throws {
+            let container = DecimalContainer(value: Decimal(string: "-99.99")!)
+            let encoded = try YYJSONEncoder().encode(container)
+            let result = String(data: encoded, encoding: .utf8)!
+            #expect(result == #"{"value":-99.99}"#)
+        }
+
+        @Test func encodeZeroDecimal() throws {
+            let container = DecimalContainer(value: Decimal.zero)
+            let encoded = try YYJSONEncoder().encode(container)
+            let result = String(data: encoded, encoding: .utf8)!
+            #expect(result == #"{"value":0}"#)
+        }
+
+        @Test func encodeHighPrecisionDecimal() throws {
+            let value = Decimal(string: "0.123456789012345678")!
+            let container = DecimalContainer(value: value)
+            let encoded = try YYJSONEncoder().encode(container)
+            let result = String(data: encoded, encoding: .utf8)!
+            #expect(result == #"{"value":0.123456789012345678}"#)
+        }
+
+        @Test func encodeDecimalWithManyDigits() throws {
+            let value = Decimal(string: "12345678901234567890")!
+            let container = DecimalContainer(value: value)
+            let encoded = try YYJSONEncoder().encode(container)
+            let result = String(data: encoded, encoding: .utf8)!
+            #expect(result == #"{"value":12345678901234567890}"#)
+        }
+
+        @Test func encodeNaNDecimalThrows() throws {
+            let container = DecimalContainer(value: Decimal.nan)
+            #expect(throws: YYJSONError.self) {
+                _ = try YYJSONEncoder().encode(container)
+            }
+        }
+
+        @Test func encodeNaNDecimalAtTopLevelThrows() throws {
+            #expect(throws: YYJSONError.self) {
+                _ = try YYJSONEncoder().encode(Decimal.nan)
+            }
+        }
+
+        @Test func encodeOptionalDecimalWithValue() throws {
+            struct Container: Codable {
+                let value: Decimal?
+            }
+            let container = Container(value: Decimal(string: "1.5")!)
+            let encoded = try YYJSONEncoder().encode(container)
+            let result = String(data: encoded, encoding: .utf8)!
+            #expect(result == #"{"value":1.5}"#)
+        }
+
+        @Test func encodeOptionalDecimalNilIsOmitted() throws {
+            struct Container: Codable {
+                let value: Decimal?
+            }
+            let container = Container(value: nil)
+            let encoded = try YYJSONEncoder().encode(container)
+            let result = String(data: encoded, encoding: .utf8)!
+            #expect(result == #"{}"#)
+        }
+
+        @Test func encodeNestedDecimal() throws {
+            struct Inner: Codable {
+                let amount: Decimal
+            }
+            struct Outer: Codable {
+                let inner: Inner
+            }
+            let container = Outer(inner: Inner(amount: Decimal(string: "99.99")!))
+            let encoded = try YYJSONEncoder().encode(container)
+            let result = String(data: encoded, encoding: .utf8)!
+            #expect(result == #"{"inner":{"amount":99.99}}"#)
+        }
+
+        @Test func encodeStructWithMultipleDecimalFields() throws {
+            struct Money: Codable {
+                let amount: Decimal
+                let tax: Decimal
+                let total: Decimal
+            }
+            let money = Money(
+                amount: Decimal(100),
+                tax: Decimal(string: "8.25")!,
+                total: Decimal(string: "108.25")!
+            )
+            var encoder = YYJSONEncoder()
+            encoder.writeOptions = .sortedKeys
+            let encoded = try encoder.encode(money)
+            let result = String(data: encoded, encoding: .utf8)!
+            #expect(result == #"{"amount":100,"tax":8.25,"total":108.25}"#)
+        }
+
+        @Test func encodeDecimalInDictionary() throws {
+            let dict: [String: Decimal] = ["price": Decimal(string: "9.99")!]
+            let encoded = try YYJSONEncoder().encode(dict)
+            let result = String(data: encoded, encoding: .utf8)!
+            #expect(result == #"{"price":9.99}"#)
+        }
+
+        @Test func encodeDecimalInNestedArray() throws {
+            let values: [[Decimal]] = [
+                [Decimal(string: "1.1")!, Decimal(string: "2.2")!],
+                [Decimal(string: "3.3")!, Decimal(string: "4.4")!],
+            ]
+            let encoded = try YYJSONEncoder().encode(values)
+            let result = String(data: encoded, encoding: .utf8)!
+            #expect(result == "[[1.1,2.2],[3.3,4.4]]")
+        }
+
+        @Test func encodedDecimalIsJSONNumberNotString() throws {
+            let container = DecimalContainer(value: Decimal(string: "42.5")!)
+            let encoded = try YYJSONEncoder().encode(container)
+            let result = String(data: encoded, encoding: .utf8)!
+            #expect(!result.contains("\"42.5\""))
+            #expect(result.contains("42.5"))
+        }
+
+        @Test func encodedDecimalLooksLikeForeignJSONEncoder() throws {
+            struct Container: Codable {
+                let value: Decimal
+            }
+            let value = Decimal(string: "1234.5678")!
+            let container = Container(value: value)
+            let foundation = try JSONEncoder().encode(container)
+            let ours = try YYJSONEncoder().encode(container)
+            #expect(String(data: foundation, encoding: .utf8) == String(data: ours, encoding: .utf8))
+        }
+
+        // MARK: - Overflow / Underflow
+
+        @Test func encodeGreatestFiniteMagnitude() throws {
+            // The encoder writes the Decimal's exact text without going through
+            // Double, so even values beyond Double's range serialize losslessly.
+            let container = DecimalContainer(value: Decimal.greatestFiniteMagnitude)
+            let encoded = try YYJSONEncoder().encode(container)
+            let result = String(data: encoded, encoding: .utf8)!
+            #expect(result.contains(Decimal.greatestFiniteMagnitude.description))
+        }
+
+        @Test func encodeLeastFiniteMagnitude() throws {
+            let container = DecimalContainer(value: Decimal.leastFiniteMagnitude)
+            let encoded = try YYJSONEncoder().encode(container)
+            let result = String(data: encoded, encoding: .utf8)!
+            #expect(result.contains(Decimal.leastFiniteMagnitude.description))
+        }
+
+        @Test func encodeLeastNormalMagnitude() throws {
+            let container = DecimalContainer(value: Decimal.leastNormalMagnitude)
+            let encoded = try YYJSONEncoder().encode(container)
+            let result = String(data: encoded, encoding: .utf8)!
+            #expect(result.contains(Decimal.leastNormalMagnitude.description))
+        }
+
+        @Test func encodePreservesFullPrecisionBeyondDouble() throws {
+            // The encoder bypasses Double entirely, so the JSON output retains
+            // every digit even when re-decoding would lose precision.
+            let value = Decimal(string: "0.12345678901234567890123456789012345678")!
+            let container = DecimalContainer(value: value)
+            let encoded = try YYJSONEncoder().encode(container)
+            let result = String(data: encoded, encoding: .utf8)!
+            #expect(result.contains("0.12345678901234567890123456789012345678"))
+        }
+
+        @Test func decimalRoundtripBeyondDoublePreservesPrecision() throws {
+            // Both encoding and decoding bypass Double for Decimal: the encoder
+            // writes the raw text and the decoder parses the raw text. This
+            // makes round-trips lossless even past Double's ~17-digit precision.
+            let value = Decimal(string: "0.12345678901234567890123456789012345678")!
+            let container = DecimalContainer(value: value)
+            let encoded = try YYJSONEncoder().encode(container)
+            let decoded = try YYJSONDecoder().decode(DecimalContainer.self, from: encoded)
+            #expect(decoded.value == value)
+        }
+
+        @Test func roundtripGreatestFiniteMagnitude() throws {
+            // greatestFiniteMagnitude overflows Double, but the raw-text path
+            // through both encoder and decoder preserves it losslessly.
+            let container = DecimalContainer(value: Decimal.greatestFiniteMagnitude)
+            let encoded = try YYJSONEncoder().encode(container)
+            let decoded = try YYJSONDecoder().decode(DecimalContainer.self, from: encoded)
+            #expect(decoded.value == Decimal.greatestFiniteMagnitude)
+        }
+    }
+
 #endif  // !YYJSON_DISABLE_WRITER && !YYJSON_DISABLE_READER
