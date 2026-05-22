@@ -1365,4 +1365,55 @@ import Testing
         }
     }
 
+    @Suite("YYJSONDecoder - NumberDecodingStrategy")
+    struct DecoderNumberStrategyTests {
+        struct Container: Codable, Equatable {
+            let value: Decimal
+        }
+
+        @Test func defaultsToLossless() {
+            #expect(YYJSONDecoder().numberDecodingStrategy == .lossless)
+        }
+
+        @Test func fastModeDecodesOrdinaryNumbers() throws {
+            var decoder = YYJSONDecoder()
+            decoder.numberDecodingStrategy = .fast
+            let data = Data("[1, 2.5, -3, 4e2]".utf8)
+            let result = try decoder.decode([Double].self, from: data)
+            #expect(result == [1.0, 2.5, -3.0, 400.0])
+        }
+
+        @Test func fastModeLosesFractionalDecimalPrecision() throws {
+            // A value with more significant digits than `Double` can hold.
+            // `.lossless` parses the original text directly; `.fast` routes through
+            // `Double` and recovers only ~17 significant digits.
+            let json = #"{"value": 1.234567890123456789012345}"#
+            let data = Data(json.utf8)
+            var fast = YYJSONDecoder()
+            fast.numberDecodingStrategy = .fast
+            let lossless = YYJSONDecoder()
+            let fastResult = try fast.decode(Container.self, from: data)
+            let losslessResult = try lossless.decode(Container.self, from: data)
+            let exact = Decimal(string: "1.234567890123456789012345")
+            #expect(losslessResult.value == exact)
+            #expect(fastResult.value != exact)
+        }
+
+        @Test func fastModeLosesPrecisionForIntegersBeyondUInt64() throws {
+            // 22-digit integer is well beyond UInt64.max. `.lossless` decodes it
+            // into Decimal exactly; `.fast` parses it as `Double` and the original
+            // digits are clipped to Double's precision.
+            let json = #"{"value": 1234567890123456789012}"#
+            let data = Data(json.utf8)
+            var fast = YYJSONDecoder()
+            fast.numberDecodingStrategy = .fast
+            let lossless = YYJSONDecoder()
+            let exact = Decimal(string: "1234567890123456789012")
+            let fastResult = try fast.decode(Container.self, from: data)
+            let losslessResult = try lossless.decode(Container.self, from: data)
+            #expect(losslessResult.value == exact)
+            #expect(fastResult.value != exact)
+        }
+    }
+
 #endif  // !YYJSON_DISABLE_READER

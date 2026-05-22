@@ -171,6 +171,9 @@ import Foundation
         /// The strategy used by a decoder when it encounters exceptional floating-point values.
         public var nonConformingFloatDecodingStrategy: NonConformingFloatDecodingStrategy = .throw
 
+        /// The strategy used by a decoder when reading JSON numbers.
+        public var numberDecodingStrategy: NumberDecodingStrategy = .lossless
+
         #if !YYJSON_DISABLE_NON_STANDARD
 
             /// Specifies that decoding supports the JSON5 syntax.
@@ -194,6 +197,7 @@ import Foundation
             self.dateDecodingStrategy = .deferredToDate
             self.dataDecodingStrategy = .base64
             self.nonConformingFloatDecodingStrategy = .throw
+            self.numberDecodingStrategy = .lossless
             #if !YYJSON_DISABLE_NON_STANDARD
                 self.allowsJSON5 = false
             #endif
@@ -211,10 +215,14 @@ import Foundation
             #if !YYJSON_DISABLE_NON_STANDARD
                 options.formUnion(allowsJSON5.readOptions)
             #endif
-            // Preserve the original text of every JSON number so that high-precision
-            // types like `Decimal` can be decoded losslessly. yyjson would otherwise
-            // store numbers as Int64/UInt64/Double, capping precision at ~17 digits.
-            options.insert(.numberAsRaw)
+            // The `.lossless` strategy preserves the original text of every JSON
+            // number so that high-precision types like `Decimal` can be decoded
+            // exactly. `.fast` lets yyjson parse numbers as `Int64`/`UInt64`/`Double`
+            // natively, restoring the library's native throughput at the cost of
+            // fractional `Decimal` precision and very large integer range.
+            if numberDecodingStrategy == .lossless {
+                options.insert(.numberAsRaw)
+            }
 
             let document = try YYDocument(data: data, options: options)
             guard let root = document.root else {
@@ -381,6 +389,33 @@ import Foundation
 
         /// The strategy that decodes exceptional floating-point values from a specified string representation.
         case convertFromString(positiveInfinity: String, negativeInfinity: String, nan: String)
+    }
+
+    /// The strategies for decoding JSON numbers,
+    /// trading exact precision for throughput.
+    public enum NumberDecodingStrategy: Sendable {
+        /// Reads every JSON number's original input text and parses it directly into
+        /// the requested Swift type.
+        ///
+        /// Required for lossless `Decimal` decoding
+        /// (including fractional values like `0.1` and integers beyond `UInt64`).
+        /// This is the default and matches Foundation `JSONDecoder`'s precision contract.
+        case lossless
+
+        /// Reads numbers using yyjson's native `Int64`/`UInt64`/`Double` parsers.
+        ///
+        /// Recovers the library's native throughput for number-heavy payloads,
+        /// at the cost of two correctness guarantees:
+        ///
+        /// - Fractional values decoded as `Decimal` go through `Double`,
+        ///   so they may not round-trip exactly
+        ///   (e.g. `0.1` decodes as `Decimal(0.1000000000000000055...)`).
+        /// - Integer literals outside the `Int64`/`UInt64` range fail to decode,
+        ///   even into `Decimal`.
+        ///
+        /// Choose this when you control the data shape
+        /// and know it doesn't contain high-precision decimals or arbitrary-precision integers.
+        case fast
     }
 
     // MARK: - Internal Decoder Implementation
