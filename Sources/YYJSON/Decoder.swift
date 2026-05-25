@@ -33,7 +33,8 @@ import Foundation
     /// so numbers normally arrive as raw values whose original input text is returned verbatim.
     /// For values stored as a parsed number
     /// (when callers bypass the decoder and construct a value manually),
-    /// the shortest round-trip representation is emitted via `yyjson_val_write`.
+    /// the typed getter is formatted via Swift's locale-independent `String`
+    /// initializers, which produce shortest round-trippable representations.
     /// Returns `nil` if the value is neither numeric nor raw.
     @inline(__always)
     func yyNumberText(_ val: UnsafeMutablePointer<yyjson_val>) -> String? {
@@ -46,15 +47,10 @@ import Foundation
             )
             return String(decoding: buf, as: UTF8.self)
         }
-        guard yyjson_is_num(val) else { return nil }
-        var len: size_t = 0
-        guard let buf = yyjson_val_write(val, 0, &len) else { return nil }
-        defer { free(buf) }
-        let bytes = UnsafeBufferPointer(
-            start: UnsafeRawPointer(buf).assumingMemoryBound(to: UInt8.self),
-            count: len
-        )
-        return String(decoding: bytes, as: UTF8.self)
+        if yyjson_is_sint(val) { return String(yyjson_get_sint(val)) }
+        if yyjson_is_uint(val) { return String(yyjson_get_uint(val)) }
+        if yyjson_is_real(val) { return String(yyjson_get_real(val)) }
+        return nil
     }
 
     /// Returns true if a JSON value carries numeric content,
