@@ -1365,24 +1365,32 @@ import Testing
         @Test func encodeGreatestFiniteMagnitude() throws {
             // The encoder writes the Decimal's exact text without going through
             // Double, so even values beyond Double's range serialize losslessly.
-            let container = DecimalContainer(value: Decimal.greatestFiniteMagnitude)
+            // Compare against POSIX-formatted text since the encoder pins its
+            // output to POSIX (and `Decimal.description` is locale-dependent).
+            let posix = Locale(identifier: "en_US_POSIX")
+            let value = Decimal.greatestFiniteMagnitude
+            let container = DecimalContainer(value: value)
             let encoded = try YYJSONEncoder().encode(container)
             let result = String(data: encoded, encoding: .utf8)!
-            #expect(result.contains(Decimal.greatestFiniteMagnitude.description))
+            #expect(result.contains(NSDecimalNumber(decimal: value).description(withLocale: posix)))
         }
 
         @Test func encodeLeastFiniteMagnitude() throws {
-            let container = DecimalContainer(value: Decimal.leastFiniteMagnitude)
+            let posix = Locale(identifier: "en_US_POSIX")
+            let value = Decimal.leastFiniteMagnitude
+            let container = DecimalContainer(value: value)
             let encoded = try YYJSONEncoder().encode(container)
             let result = String(data: encoded, encoding: .utf8)!
-            #expect(result.contains(Decimal.leastFiniteMagnitude.description))
+            #expect(result.contains(NSDecimalNumber(decimal: value).description(withLocale: posix)))
         }
 
         @Test func encodeLeastNormalMagnitude() throws {
-            let container = DecimalContainer(value: Decimal.leastNormalMagnitude)
+            let posix = Locale(identifier: "en_US_POSIX")
+            let value = Decimal.leastNormalMagnitude
+            let container = DecimalContainer(value: value)
             let encoded = try YYJSONEncoder().encode(container)
             let result = String(data: encoded, encoding: .utf8)!
-            #expect(result.contains(Decimal.leastNormalMagnitude.description))
+            #expect(result.contains(NSDecimalNumber(decimal: value).description(withLocale: posix)))
         }
 
         @Test func encodePreservesFullPrecisionBeyondDouble() throws {
