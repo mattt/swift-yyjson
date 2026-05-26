@@ -1127,6 +1127,28 @@ import Testing
                 let result = try decoder.decode(SimpleStruct.self, from: data)
                 #expect(result.name == "test")
             }
+
+            @Test func decodeJSON5HexLiteralAsInteger() throws {
+                // Under `.lossless` (the default), `YYJSON_READ_NUMBER_AS_RAW`
+                // preserves hex literals as raw text. The raw-number parsers
+                // must auto-detect the `0x` prefix so hex still decodes.
+                let json = #"{"name": "x", "value": 0xFF}"#
+                let data = json.data(using: .utf8)!
+                var decoder = YYJSONDecoder()
+                decoder.allowsJSON5 = true
+                let result = try decoder.decode(SimpleStruct.self, from: data)
+                #expect(result.value == 255)
+            }
+
+            @Test func decodeJSON5HexLiteralAsDouble() throws {
+                struct Container: Decodable { let value: Double }
+                let json = #"{"value": 0x10}"#
+                let data = json.data(using: .utf8)!
+                var decoder = YYJSONDecoder()
+                decoder.allowsJSON5 = true
+                let result = try decoder.decode(Container.self, from: data)
+                #expect(result.value == 16.0)
+            }
         }
 
     #endif  // !YYJSON_DISABLE_NON_STANDARD

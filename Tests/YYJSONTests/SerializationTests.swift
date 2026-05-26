@@ -133,6 +133,21 @@ import Testing
                 #expect(result?["key"] as? String == "value")
             }
 
+            @Test func readJSON5HexLiteralAsInteger() throws {
+                // `YYJSONSerialization` always reads numbers as raw text, so a
+                // JSON5 hex literal arrives as `"0xFF"` and must round-trip as
+                // an integer-valued `NSNumber` rather than falling through to
+                // `NSNull` (which is what `Int64("0xFF")` would do).
+                let json = #"{"hex": 0xFF}"#
+                let data = json.data(using: .utf8)!
+                let result =
+                    try YYJSONSerialization.jsonObject(
+                        with: data,
+                        options: .json5Allowed
+                    ) as? NSDictionary
+                #expect(result?["hex"] as? Int == 255)
+            }
+
         #endif  // !YYJSON_DISABLE_NON_STANDARD
 
         @Test func readInvalidJSON() throws {

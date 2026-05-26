@@ -6,6 +6,38 @@ import Foundation
 /// pin parsing to POSIX to avoid mis-decoding under locales that use `,`.
 private let yyPOSIXLocale = Locale(identifier: "en_US_POSIX")
 
+#if !YYJSON_DISABLE_READER
+
+    /// Parses a JSON numeric literal as a fixed-width integer.
+    ///
+    /// Accepts plain decimal integers (including a leading sign) and the
+    /// JSON5 hex spellings (`0xFF`, `-0X10`, `+0x2A`) preserved as raw text
+    /// under `YYJSON_READ_NUMBER_AS_RAW`. Returns `nil` for fractional or
+    /// exponential text so callers can fall through to `Decimal`/`Double`
+    /// instead of silently truncating through `Double`.
+    @inline(__always)
+    fileprivate func yyParseStrictInteger<T: FixedWidthInteger>(_ text: String) -> T? {
+        return text.withCString { ptr -> T? in
+            let len = strlen(ptr)
+            guard len > 0 else { return nil }
+            var end: UnsafeMutablePointer<CChar>?
+            errno = 0
+            if T.isSigned {
+                let v = strtoll(ptr, &end, 0)
+                guard errno == 0, let e = end, ptr.distance(to: UnsafePointer(e)) == Int(len)
+                else { return nil }
+                return T(exactly: v)
+            }
+            if ptr.pointee == 0x2D /* '-' */ { return nil }
+            let v = strtoull(ptr, &end, 0)
+            guard errno == 0, let e = end, ptr.distance(to: UnsafePointer(e)) == Int(len)
+            else { return nil }
+            return T(exactly: v)
+        }
+    }
+
+#endif  // !YYJSON_DISABLE_READER
+
 /// An object that converts between JSON and the equivalent Foundation objects.
 /// This provides a drop-in replacement for Foundation's JSONSerialization using yyjson.
 public enum YYJSONSerialization {
@@ -443,17 +475,23 @@ public enum YYJSONSerialization {
             // signed/unsigned 64-bit integers when possible, then `NSDecimalNumber`
             // for fractional or oversized integer values, and finally `Double` as a
             // last resort for values outside `Decimal`'s representable range.
+            //
+            // JSON5 extended numbers (`0xFF`, `Infinity`, …) preserved as raw
+            // text are parsed via the C runtime through `yyParseDouble` so they
+            // survive the round-trip; the integer paths use `Int64`/`UInt64`
+            // initializers to reject fractional/exponential text (which would
+            // otherwise truncate through `Double`).
             if let raw = rawValue, yyjson_is_raw(raw), let text = yyRawText(raw) {
-                if let intVal = Int64(text) {
+                if let intVal: Int64 = yyParseStrictInteger(text) {
                     return NSNumber(value: intVal)
                 }
-                if let uintVal = UInt64(text) {
+                if let uintVal: UInt64 = yyParseStrictInteger(text) {
                     return NSNumber(value: uintVal)
                 }
                 if let dec = Decimal(string: text, locale: yyPOSIXLocale), !dec.isNaN {
                     return NSDecimalNumber(decimal: dec)
                 }
-                if let dbl = Double(text), dbl.isFinite {
+                if let dbl = yyParseDouble(raw), dbl.isFinite {
                     return NSNumber(value: dbl)
                 }
             }

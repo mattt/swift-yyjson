@@ -118,6 +118,20 @@ import Foundation
         if yyjson_is_raw(val) {
             guard let ptr = unsafe_yyjson_get_raw(val) else { return nil }
             let len = unsafe_yyjson_get_len(val)
+            var iend: UnsafeMutablePointer<CChar>?
+            errno = 0
+            let i = strtoll(ptr, &iend, 0)
+            if errno == 0, let e = iend, ptr.distance(to: UnsafePointer(e)) == len {
+                return Double(i)
+            }
+            if len == 0 || ptr.pointee != 0x2D /* '-' */ {
+                errno = 0
+                var uend: UnsafeMutablePointer<CChar>?
+                let u = strtoull(ptr, &uend, 0)
+                if errno == 0, let e = uend, ptr.distance(to: UnsafePointer(e)) == len {
+                    return Double(u)
+                }
+            }
             var end: UnsafeMutablePointer<CChar>?
             let d = strtod(ptr, &end)
             guard let e = end, ptr.distance(to: UnsafePointer(e)) == len else { return nil }

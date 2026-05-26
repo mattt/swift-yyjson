@@ -370,6 +370,12 @@ import Foundation
         }
 
         /// The number value, or `nil` if not a number.
+        ///
+        /// Raw numeric text (parsed under `YYJSONReadOptions.numberAsRaw` or
+        /// `bigNumberAsRaw`) is run through the same `strtoll`/`strtoull`/
+        /// `strtod` pipeline the decoder uses, so JSON5 extras like hex
+        /// literals (`0xFF`) and non-finite spellings (`Infinity`, `NaN`)
+        /// surface here as `Double` instead of returning `nil`.
         public var number: Double? {
             switch storage {
             case .numberInt(let value, _):
@@ -377,8 +383,7 @@ import Foundation
             case .numberDouble(let value, _):
                 return value
             case .numberRaw(let ptr):
-                guard let text = yyRawText(ptr) else { return nil }
-                return Double(text)
+                return yyParseDouble(ptr)
             default:
                 return nil
             }

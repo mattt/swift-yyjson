@@ -408,6 +408,30 @@ import Testing
             #expect(abs(value.number! - 3.14159) < 1e-9)
         }
 
+        #if !YYJSON_DISABLE_NON_STANDARD
+
+            @Test func numberParsesJSON5HexFromRawText() throws {
+                // With `.numberAsRaw` + `.allowExtendedNumbers`, hex literals are
+                // preserved as raw text. `.number` must route through the C
+                // integer fast path (base 0) so the hex value still surfaces as
+                // a `Double` instead of returning `nil`.
+                let value = try YYJSONValue(
+                    string: "0xFF",
+                    options: [.numberAsRaw, .allowExtendedNumbers]
+                )
+                #expect(value.number == 255.0)
+            }
+
+            @Test func numberParsesInfinityFromRawText() throws {
+                let value = try YYJSONValue(
+                    string: "Infinity",
+                    options: [.numberAsRaw, .allowInfAndNaN]
+                )
+                #expect(value.number?.isInfinite == true)
+            }
+
+        #endif  // !YYJSON_DISABLE_NON_STANDARD
+
         @Test func descriptionPreservesRawNumberText() throws {
             let value = try YYJSONValue(string: "1.0000000000000001", options: .numberAsRaw)
             #expect(value.description == "1.0000000000000001")
