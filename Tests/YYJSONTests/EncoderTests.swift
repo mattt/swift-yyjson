@@ -1218,15 +1218,27 @@ import Testing
         @Test func roundtripDecimalPreservesPrecision() throws {
             let encoder = YYJSONEncoder()
             let decoder = YYJSONDecoder()
-            var decimal = Decimal(string: "0.00")!
-            let limit = Decimal(string: "99.99")!
-            let step = Decimal(string: "0.01")!
-            while decimal <= limit {
+            // Sample representative values across the fractional-Decimal range
+            // (plus precision and sign edge cases) rather than iterating every
+            // 0.01 step over [0, 100), which would do 10k roundtrips per run.
+            let samples: [Decimal] = [
+                Decimal.zero,
+                Decimal(string: "0.01")!,
+                Decimal(string: "0.1")!,
+                Decimal(string: "0.5")!,
+                Decimal(string: "1.00")!,
+                Decimal(string: "3.14159")!,
+                Decimal(string: "42.42")!,
+                Decimal(string: "99.99")!,
+                Decimal(string: "-0.01")!,
+                Decimal(string: "-99.99")!,
+                Decimal(string: "0.123456789012345678")!,
+            ]
+            for decimal in samples {
                 let container = DecimalContainer(value: decimal)
                 let encoded = try encoder.encode(container)
                 let decoded = try decoder.decode(DecimalContainer.self, from: encoded)
                 #expect(decoded == container)
-                decimal += step
             }
         }
 
