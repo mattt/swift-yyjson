@@ -475,13 +475,14 @@ import Foundation
         /// Reads numbers using yyjson's native `Int64`/`UInt64`/`Double` parsers.
         ///
         /// Recovers the library's native throughput for number-heavy payloads,
-        /// at the cost of two correctness guarantees:
+        /// at the cost of precision: every numeric value is routed through
+        /// `Double` before being handed to Swift, so
         ///
-        /// - Fractional values decoded as `Decimal` go through `Double`,
-        ///   so they may not round-trip exactly
+        /// - Fractional values decoded as `Decimal` may not round-trip exactly
         ///   (e.g. `0.1` decodes as `Decimal(0.1000000000000000055...)`).
-        /// - Integer literals outside the `Int64`/`UInt64` range fail to decode,
-        ///   even into `Decimal`.
+        /// - Integer literals outside the `Int64`/`UInt64` range are parsed as
+        ///   `Double` and decode into `Decimal` with `Double` precision rather
+        ///   than preserving every digit.
         ///
         /// Choose this when you control the data shape
         /// and know it doesn't contain high-precision decimals or arbitrary-precision integers.
