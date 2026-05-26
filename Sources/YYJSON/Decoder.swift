@@ -60,11 +60,59 @@ import Foundation
         return yyjson_is_num(val) || yyjson_is_raw(val)
     }
 
+    /// Returns a short human-readable name for `val`'s JSON type, used in
+    /// `YYJSONError.typeMismatch` diagnostics.
+    @inline(__always)
+    func yyTypeString(_ val: UnsafeMutablePointer<yyjson_val>) -> String {
+        switch yyjson_get_type(val) {
+        case YYJSON_TYPE_NULL: return "null"
+        case YYJSON_TYPE_BOOL: return "bool"
+        case YYJSON_TYPE_NUM, YYJSON_TYPE_RAW: return "number"
+        case YYJSON_TYPE_STR: return "string"
+        case YYJSON_TYPE_ARR: return "array"
+        case YYJSON_TYPE_OBJ: return "object"
+        default: return "unknown"
+        }
+    }
+
+    /// Decodes a JSON numeric value into a `Decimal`,
+    /// preserving the original input text when the document was read with
+    /// `YYJSON_READ_NUMBER_AS_RAW`.
+    ///
+    /// Throws `YYJSONError.missingValue` when `value` is `nil`,
+    /// `YYJSONError.typeMismatch` when the value is not numeric,
+    /// and `YYJSONError.invalidData` when the numeric text does not fit in
+    /// `Decimal`'s representable range.
+    func yyDecodeDecimal(from value: UnsafeMutablePointer<yyjson_val>?, path: String) throws -> Decimal {
+        guard let value = value else {
+            throw YYJSONError.missingValue(path: path)
+        }
+        guard yyIsNumeric(value) else {
+            throw YYJSONError.typeMismatch(
+                expected: "number",
+                actual: yyTypeString(value),
+                path: path
+            )
+        }
+        guard let string = yyNumberText(value),
+            let decimal = Decimal(string: string, locale: yyPOSIXLocale)
+        else {
+            throw YYJSONError.invalidData(
+                "Could not parse number as Decimal",
+                path: path
+            )
+        }
+        return decimal
+    }
+
     /// Parses a numeric JSON value as `Double` without allocating an intermediate `String`.
     ///
     /// For raw values (the common path under `YYJSON_READ_NUMBER_AS_RAW`),
-    /// `strtod` is called directly on yyjson's null-terminated buffer.
-    /// For values stored natively, `yyjson_get_num` returns the parsed result.
+    /// `strtoll`/`strtoull` are tried first with base 0 so JSON5 hex literals
+    /// (`0xFF`) preserved as raw text are admitted as `Double`-convertible
+    /// integers; `strtod` handles the remaining fractional, exponential, and
+    /// non-finite (`Infinity`/`NaN`) forms. For values stored natively,
+    /// `yyjson_get_num` returns the parsed result.
     @inline(__always)
     func yyParseDouble(_ val: UnsafeMutablePointer<yyjson_val>) -> Double? {
         if yyjson_is_raw(val) {
@@ -836,7 +884,7 @@ import Foundation
             }
 
             if type == Decimal.self {
-                let decimal = try decodeDecimal(from: val, path: pathString(for: key))
+                let decimal = try yyDecodeDecimal(from: val, path: pathString(for: key))
                 return decimal as! T
             }
 
@@ -934,30 +982,6 @@ import Foundation
                 )
                 return try closure(decoder)
             }
-        }
-
-        private func decodeDecimal(from value: UnsafeMutablePointer<yyjson_val>?, path: String)
-            throws -> Decimal
-        {
-            guard let value = value else {
-                throw YYJSONError.missingValue(path: path)
-            }
-            guard yyIsNumeric(value) else {
-                throw YYJSONError.typeMismatch(
-                    expected: "number",
-                    actual: typeString(value),
-                    path: path
-                )
-            }
-            guard let string = yyNumberText(value),
-                let decimal = Decimal(string: string, locale: yyPOSIXLocale)
-            else {
-                throw YYJSONError.invalidData(
-                    "Could not parse number as Decimal",
-                    path: path
-                )
-            }
-            return decimal
         }
 
         private func decodeData(from value: UnsafeMutablePointer<yyjson_val>?, path: String) throws
@@ -1374,7 +1398,7 @@ import Foundation
             }
 
             if type == Decimal.self {
-                let decimal = try decodeDecimal(from: val, path: pathString)
+                let decimal = try yyDecodeDecimal(from: val, path: pathString)
                 return decimal as! T
             }
 
@@ -1466,27 +1490,6 @@ import Foundation
                 )
                 return try closure(decoder)
             }
-        }
-
-        private func decodeDecimal(from value: UnsafeMutablePointer<yyjson_val>, path: String)
-            throws -> Decimal
-        {
-            guard yyIsNumeric(value) else {
-                throw YYJSONError.typeMismatch(
-                    expected: "number",
-                    actual: typeString(value),
-                    path: path
-                )
-            }
-            guard let string = yyNumberText(value),
-                let decimal = Decimal(string: string, locale: yyPOSIXLocale)
-            else {
-                throw YYJSONError.invalidData(
-                    "Could not parse number as Decimal",
-                    path: path
-                )
-            }
-            return decimal
         }
 
         private func decodeData(from value: UnsafeMutablePointer<yyjson_val>, path: String) throws
@@ -1816,7 +1819,7 @@ import Foundation
             }
 
             if type == Decimal.self {
-                let decimal = try decodeDecimal(from: val, path: pathString)
+                let decimal = try yyDecodeDecimal(from: val, path: pathString)
                 return decimal as! T
             }
 
@@ -1908,27 +1911,6 @@ import Foundation
                 )
                 return try closure(decoder)
             }
-        }
-
-        private func decodeDecimal(from value: UnsafeMutablePointer<yyjson_val>, path: String)
-            throws -> Decimal
-        {
-            guard yyIsNumeric(value) else {
-                throw YYJSONError.typeMismatch(
-                    expected: "number",
-                    actual: typeString(value),
-                    path: path
-                )
-            }
-            guard let string = yyNumberText(value),
-                let decimal = Decimal(string: string, locale: yyPOSIXLocale)
-            else {
-                throw YYJSONError.invalidData(
-                    "Could not parse number as Decimal",
-                    path: path
-                )
-            }
-            return decimal
         }
 
         private func decodeData(from value: UnsafeMutablePointer<yyjson_val>, path: String) throws
