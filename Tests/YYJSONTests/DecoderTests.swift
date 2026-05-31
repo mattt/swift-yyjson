@@ -706,9 +706,9 @@ import Testing
 
         @Test func decodeDecimalPreservesPrecisionAcrossIncrements() throws {
             let decoder = YYJSONDecoder()
-            // Format Decimals with a fixed POSIX locale so the generated JSON
-            // always uses `.` as the decimal separator (otherwise locales like
-            // de_DE would produce `0,01` and fail to parse as JSON).
+            // Format Decimals with a fixed POSIX locale
+            // so the generated JSON always uses `.` as the decimal separator
+            // (otherwise locales like de_DE would produce `0,01` and fail to parse as JSON)
             let posix = Locale(identifier: "en_US_POSIX")
             var decimal = Decimal(string: "0.00")!
             let limit = Decimal(string: "99.99")!
@@ -1134,9 +1134,9 @@ import Testing
             }
 
             @Test func decodeJSON5HexLiteralAsInteger() throws {
-                // Under `.lossless` (the default), `YYJSON_READ_NUMBER_AS_RAW`
-                // preserves hex literals as raw text. The raw-number parsers
-                // must auto-detect the `0x` prefix so hex still decodes.
+                // Under `.lossless` (the default),
+                // `YYJSON_READ_NUMBER_AS_RAW` preserves hex literals as raw text.
+                // The raw-number parsers must auto-detect the `0x` prefix so hex still decodes.
                 let json = #"{"name": "x", "value": 0xFF}"#
                 let data = json.data(using: .utf8)!
                 var decoder = YYJSONDecoder()

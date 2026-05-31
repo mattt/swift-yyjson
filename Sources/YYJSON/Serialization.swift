@@ -7,19 +7,20 @@ import Foundation
     import Glibc
 #endif
 
-/// Locale used to parse JSON numbers into `Decimal`. JSON numbers always use
-/// `.` as the decimal separator regardless of the host's user locale, so we
-/// pin parsing to POSIX to avoid mis-decoding under locales that use `,`.
+/// Locale used to parse JSON numbers into `Decimal`.
+/// JSON numbers always use `.` as the decimal separator,
+/// so we pin parsing to POSIX to avoid mis-decoding under locales that use `,`.
 private let yyPOSIXLocale = Locale(identifier: "en_US_POSIX")
 
 #if !YYJSON_DISABLE_READER
 
     /// Parses a JSON numeric literal as a fixed-width integer.
     ///
-    /// Accepts plain decimal integers (including a leading sign) and the
-    /// JSON5 hex spellings (`0xFF`, `-0X10`, `+0x2A`) preserved as raw text
-    /// under `YYJSON_READ_NUMBER_AS_RAW`. Returns `nil` for fractional or
-    /// exponential text so callers can fall through to `Decimal`/`Double`
+    /// Accepts plain decimal integers (including a leading sign)
+    /// and the JSON5 hex spellings (`0xFF`, `-0X10`, `+0x2A`)
+    /// preserved as raw text under `YYJSON_READ_NUMBER_AS_RAW`.
+    /// Returns `nil` for fractional or exponential text
+    /// so callers can fall through to `Decimal`/`Double`
     /// instead of silently truncating through `Double`.
     @inline(__always)
     fileprivate func yyParseStrictInteger<T: FixedWidthInteger>(_ text: String) -> T? {
@@ -482,12 +483,15 @@ public enum YYJSONSerialization {
             // for fractional or oversized integer values, and finally `Double` as a
             // last resort for values outside `Decimal`'s representable range.
             //
-            // JSON5 extended numbers (`0xFF`, `Infinity`, …) preserved as raw
-            // text are parsed via the C runtime through `yyParseDouble` so they
-            // survive the round-trip; the integer paths use `Int64`/`UInt64`
-            // initializers to reject fractional/exponential text (which would
-            // otherwise truncate through `Double`).
-            if let raw = rawValue, yyjson_is_raw(raw), let text = yyRawText(raw) {
+            // JSON5 extended numbers (`0xFF`, `Infinity`, …) preserved as raw text
+            // are parsed via the C runtime through `yyParseDouble`
+            // so they survive the round-trip.
+            // The integer paths use `Int64`/`UInt64` initializers to reject
+            // fractional/exponential text (which would otherwise truncate through `Double`).
+            if let raw = rawValue,
+                yyjson_is_raw(raw),
+                let text = yyRawText(raw)
+            {
                 if let intVal: Int64 = yyParseStrictInteger(text) {
                     return NSNumber(value: intVal)
                 }
