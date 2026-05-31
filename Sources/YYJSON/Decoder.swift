@@ -87,8 +87,10 @@ import Foundation
     ///
     /// Throws `YYJSONError.missingValue` when `value` is `nil`,
     /// `YYJSONError.typeMismatch` when the value is not numeric,
-    /// and `YYJSONError.invalidData` when the numeric text does not fit in
-    /// `Decimal`'s representable range.
+    /// and `YYJSONError.invalidData` when the numeric text falls outside
+    /// `Decimal`'s representable range or parses to `Decimal.nan`.
+    /// The encoder refuses to emit NaN,
+    /// so accepting it on decode would break round-trips.
     func yyDecodeDecimal(from value: UnsafeMutablePointer<yyjson_val>?, path: String) throws -> Decimal {
         guard let value = value else {
             throw YYJSONError.missingValue(path: path)
@@ -101,7 +103,8 @@ import Foundation
             )
         }
         guard let string = yyNumberText(value),
-            let decimal = Decimal(string: string, locale: yyPOSIXLocale)
+            let decimal = Decimal(string: string, locale: yyPOSIXLocale),
+            !decimal.isNaN
         else {
             throw YYJSONError.invalidData(
                 "Could not parse number as Decimal",
