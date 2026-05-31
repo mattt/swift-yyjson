@@ -3,6 +3,19 @@ import Foundation
 
 #if !YYJSON_DISABLE_READER
 
+    /// Returns the verbatim text of a `YYJSON_TYPE_RAW` value
+    /// (numbers preserved via `YYJSON_READ_NUMBER_AS_RAW` or `YYJSON_READ_BIGNUM_AS_RAW`).
+    @inline(__always)
+    internal func yyRawText(_ val: UnsafeMutablePointer<yyjson_val>) -> String? {
+        guard yyjson_is_raw(val), let ptr = unsafe_yyjson_get_raw(val) else { return nil }
+        let len = unsafe_yyjson_get_len(val)
+        let buf = UnsafeBufferPointer(
+            start: UnsafeRawPointer(ptr).assumingMemoryBound(to: UInt8.self),
+            count: len
+        )
+        return String(decoding: buf, as: UTF8.self)
+    }
+
     // MARK: - Document (Internal)
 
     /// A safe wrapper around a yyjson document.
@@ -216,6 +229,10 @@ import Foundation
             case numberInt(Int64, UnsafeMutablePointer<yyjson_val>)
             /// A JSON floating-point number stored as `Double`, with its yyjson value pointer.
             case numberDouble(Double, UnsafeMutablePointer<yyjson_val>)
+            /// A JSON number preserved as its original input text,
+            /// produced when parsing with `YYJSONReadOptions.numberAsRaw`
+            /// or `YYJSONReadOptions.bigNumberAsRaw`.
+            case numberRaw(UnsafeMutablePointer<yyjson_val>)
             /// A JSON string backed by a C string pointer and its yyjson value pointer.
             case stringPtr(UnsafePointer<CChar>, UnsafeMutablePointer<yyjson_val>)
             /// A JSON object value pointer.
@@ -239,6 +256,8 @@ import Foundation
             case .numberInt(_, let ptr):
                 return ptr
             case .numberDouble(_, let ptr):
+                return ptr
+            case .numberRaw(let ptr):
                 return ptr
             case .stringPtr(_, let ptr):
                 return ptr
@@ -276,6 +295,8 @@ import Foundation
                 } else {
                     self.storage = .numberDouble(yyjson_get_real(val), val)
                 }
+            case YYJSON_TYPE_RAW:
+                self.storage = .numberRaw(val)
             case YYJSON_TYPE_STR:
                 if let str = yyjson_get_str(val) {
                     self.storage = .stringPtr(str, val)
@@ -344,12 +365,41 @@ import Foundation
         }
 
         /// The number value, or `nil` if not a number.
+        ///
+        /// Raw numeric text (parsed under `YYJSONReadOptions.numberAsRaw` or `bigNumberAsRaw`)
+        /// is run through the same `strtoll`/`strtoull`/`strtod` pipeline the decoder uses,
+        /// so JSON5 extras like hex literals (`0xFF`) and non-finite spellings (`Infinity`, `NaN`)
+        /// surface here as `Double` instead of returning `nil`.
         public var number: Double? {
             switch storage {
             case .numberInt(let value, _):
                 return Double(value)
             case .numberDouble(let value, _):
                 return value
+            case .numberRaw(let ptr):
+                return yyParseDouble(ptr)
+            default:
+                return nil
+            }
+        }
+
+        /// The exact decimal value, or `nil` if not a number.
+        ///
+        /// When the underlying document was parsed with `YYJSONReadOptions.numberAsRaw`
+        /// (or for big numbers via `YYJSONReadOptions.bigNumberAsRaw`),
+        /// the number's original input text is parsed into a `Decimal` losslessly.
+        /// Otherwise the value is reconstructed from yyjson's parsed `Int64`/`Double` storage,
+        /// which is only approximate for non-integer values.
+        public var decimal: Decimal? {
+            switch storage {
+            case .numberInt(let value, _):
+                return Decimal(value)
+            case .numberDouble(let value, _):
+                guard value.isFinite else { return nil }
+                return Decimal(string: String(value), locale: yyPOSIXLocale)
+            case .numberRaw(let ptr):
+                guard let text = yyRawText(ptr) else { return nil }
+                return Decimal(string: text, locale: yyPOSIXLocale)
             default:
                 return nil
             }
@@ -385,6 +435,8 @@ import Foundation
                 return String(n)
             case .numberDouble(let n, _):
                 return String(n)
+            case .numberRaw(let ptr):
+                return yyRawText(ptr) ?? "null"
             case .stringPtr(let ptr, _):
                 return "\"\(String(cString: ptr))\""
             case .object(let ptr):

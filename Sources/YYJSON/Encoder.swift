@@ -62,8 +62,13 @@ import Foundation
                 writeOptions: writeOptions
             )
 
-            try value.encode(to: encoder)
-
+            // Decimal's default Encodable implementation produces a keyed container,
+            // so we intercept top-level Decimal encoding to emit a JSON number directly.
+            if let decimal = value as? Decimal {
+                encoder.value = try encoder.decimalValue(decimal, codingPath: [])
+            } else {
+                try value.encode(to: encoder)
+            }
             guard let root = encoder.value else {
                 throw YYJSONError.invalidData("Failed to encode root value")
             }
@@ -201,6 +206,28 @@ import Foundation
             #endif
             return yyjson_mut_real(doc, value)
         }
+
+        func decimalValue(_ value: Decimal, codingPath: [CodingKey]) throws
+            -> UnsafeMutablePointer<yyjson_mut_val>
+        {
+            if value.isNaN {
+                throw YYJSONError.invalidData(
+                    "Cannot encode Decimal NaN as a JSON number",
+                    path: codingPath.map { $0.stringValue }.joined(separator: ".")
+                )
+            }
+            // `Decimal.description` formats with the user's current locale,
+            // which can produce a `,` decimal separator and emit invalid JSON.
+            // Render through `NSDecimalNumber.description(withLocale:)` with POSIX
+            // so the output is always JSON-conformant.
+            var string = NSDecimalNumber(decimal: value).description(withLocale: yyPOSIXLocale)
+            return string.withUTF8 { buf in
+                guard let ptr = buf.baseAddress else {
+                    return yyjson_mut_rawncpy(doc, "0", 1)
+                }
+                return yyjson_mut_rawncpy(doc, ptr, buf.count)
+            }
+        }
     }
 
     // MARK: - Encoding Containers
@@ -334,6 +361,13 @@ import Foundation
 
             if let data = value as? Data {
                 let encodedValue = try encodeData(data, codingPath: codingPath + [key])
+                let keyVal = yyFromString(key.stringValue, in: doc)
+                _ = yyjson_mut_obj_put(obj, keyVal, encodedValue)
+                return
+            }
+
+            if let decimal = value as? Decimal {
+                let encodedValue = try encoder.decimalValue(decimal, codingPath: codingPath + [key])
                 let keyVal = yyFromString(key.stringValue, in: doc)
                 _ = yyjson_mut_obj_put(obj, keyVal, encodedValue)
                 return
@@ -708,6 +742,15 @@ import Foundation
                 return
             }
 
+            if let decimal = value as? Decimal {
+                let encodedValue = try encoder.decimalValue(
+                    decimal,
+                    codingPath: codingPath + [AnyCodingKey(index: count)]
+                )
+                _ = yyjson_mut_arr_append(arr, encodedValue)
+                return
+            }
+
             let encoder = _YYEncoder(
                 doc: doc,
                 value: nil,
@@ -1004,6 +1047,12 @@ import Foundation
 
             if let data = value as? Data {
                 self.value = try encodeData(data)
+                encoder.value = self.value
+                return
+            }
+
+            if let decimal = value as? Decimal {
+                self.value = try encoder.decimalValue(decimal, codingPath: codingPath)
                 encoder.value = self.value
                 return
             }
