@@ -41,15 +41,7 @@ import Foundation
     /// Returns `nil` if the value is neither numeric nor raw.
     @inline(__always)
     func yyNumberText(_ val: UnsafeMutablePointer<yyjson_val>) -> String? {
-        if yyjson_is_raw(val) {
-            guard let ptr = unsafe_yyjson_get_raw(val) else { return nil }
-            let len = unsafe_yyjson_get_len(val)
-            let buf = UnsafeBufferPointer(
-                start: UnsafeRawPointer(ptr).assumingMemoryBound(to: UInt8.self),
-                count: len
-            )
-            return String(decoding: buf, as: UTF8.self)
-        }
+        if yyjson_is_raw(val) { return yyRawText(val) }
         if yyjson_is_sint(val) { return String(yyjson_get_sint(val)) }
         if yyjson_is_uint(val) { return String(yyjson_get_uint(val)) }
         if yyjson_is_real(val) { return String(yyjson_get_real(val)) }
