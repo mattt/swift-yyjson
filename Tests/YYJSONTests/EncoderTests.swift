@@ -1218,9 +1218,6 @@ import Testing
         @Test func roundtripDecimalPreservesPrecision() throws {
             let encoder = YYJSONEncoder()
             let decoder = YYJSONDecoder()
-            // Sample representative values across the fractional-Decimal range
-            // (plus precision and sign edge cases) rather than iterating every
-            // 0.01 step over [0, 100), which would do 10k roundtrips per run.
             let samples: [Decimal] = [
                 Decimal.zero,
                 Decimal(string: "0.01")!,
@@ -1375,10 +1372,10 @@ import Testing
         // MARK: - Overflow / Underflow
 
         @Test func encodeGreatestFiniteMagnitude() throws {
-            // The encoder writes the Decimal's exact text without going through
-            // Double, so even values beyond Double's range serialize losslessly.
-            // Compare against POSIX-formatted text since the encoder pins its
-            // output to POSIX (and `Decimal.description` is locale-dependent).
+            // The encoder writes the Decimal's exact text without going through Double,
+            // so even values beyond Double's range serialize losslessly.
+            // Compare against POSIX-formatted text since the encoder pins its output to POSIX
+            // (and `Decimal.description` is locale-dependent).
             let posix = Locale(identifier: "en_US_POSIX")
             let value = Decimal.greatestFiniteMagnitude
             let container = DecimalContainer(value: value)
@@ -1406,8 +1403,8 @@ import Testing
         }
 
         @Test func encodePreservesFullPrecisionBeyondDouble() throws {
-            // The encoder bypasses Double entirely, so the JSON output retains
-            // every digit even when re-decoding would lose precision.
+            // The encoder bypasses Double entirely,
+            // so the JSON output retains every digit even when re-decoding would lose precision.
             let value = Decimal(string: "0.12345678901234567890123456789012345678")!
             let container = DecimalContainer(value: value)
             let encoded = try YYJSONEncoder().encode(container)
@@ -1416,9 +1413,9 @@ import Testing
         }
 
         @Test func decimalRoundtripBeyondDoublePreservesPrecision() throws {
-            // Both encoding and decoding bypass Double for Decimal: the encoder
-            // writes the raw text and the decoder parses the raw text. This
-            // makes round-trips lossless even past Double's ~17-digit precision.
+            // Both encoding and decoding bypass Double for Decimal:
+            // the encoder writes the raw text and the decoder parses the raw text.
+            // This makes round-trips lossless even past Double's ~17-digit precision.
             let value = Decimal(string: "0.12345678901234567890123456789012345678")!
             let container = DecimalContainer(value: value)
             let encoded = try YYJSONEncoder().encode(container)
@@ -1427,8 +1424,8 @@ import Testing
         }
 
         @Test func roundtripGreatestFiniteMagnitude() throws {
-            // greatestFiniteMagnitude overflows Double, but the raw-text path
-            // through both encoder and decoder preserves it losslessly.
+            // greatestFiniteMagnitude overflows Double,
+            // but the raw-text path through both encoder and decoder preserves it losslessly.
             let container = DecimalContainer(value: Decimal.greatestFiniteMagnitude)
             let encoded = try YYJSONEncoder().encode(container)
             let decoded = try YYJSONDecoder().decode(DecimalContainer.self, from: encoded)

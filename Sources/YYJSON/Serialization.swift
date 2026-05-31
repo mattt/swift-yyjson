@@ -140,9 +140,9 @@ public enum YYJSONSerialization {
                     readOptions.insert(.json5)
                 }
             #endif
-            // Preserve the original text of every JSON number so that fractional values
-            // (e.g. `0.1`) round-trip exactly through `NSDecimalNumber`, matching the
-            // precision contract of Foundation's `JSONSerialization`.
+            // Preserve the original text of every JSON number
+            // so that fractional values (e.g. `0.1`) round-trip exactly through `NSDecimalNumber`,
+            // matching the precision contract of Foundation's `JSONSerialization`.
             readOptions.insert(.numberAsRaw)
 
             let document = try YYDocument(data: data, options: readOptions)

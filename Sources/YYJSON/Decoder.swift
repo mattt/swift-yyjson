@@ -13,9 +13,9 @@ import Foundation
 
     // MARK: - Helper Functions
 
-    /// Locale used to parse JSON numbers into `Decimal`. JSON numbers always use
-    /// `.` as the decimal separator regardless of the host's user locale, so we
-    /// pin parsing to POSIX to avoid mis-decoding under locales that use `,`.
+    /// Locale used to parse JSON numbers into `Decimal`.
+    /// JSON numbers always use `.` as the decimal separator,
+    /// so we pin parsing to POSIX to avoid mis-decoding under locales that use `,`.
     private let yyPOSIXLocale = Locale(identifier: "en_US_POSIX")
 
     @inline(__always)
@@ -41,8 +41,8 @@ import Foundation
     /// so numbers normally arrive as raw values whose original input text is returned verbatim.
     /// For values stored as a parsed number
     /// (when callers bypass the decoder and construct a value manually),
-    /// the typed getter is formatted via Swift's locale-independent `String`
-    /// initializers, which produce shortest round-trippable representations.
+    /// the typed getter is formatted via Swift's locale-independent `String` initializers,
+    /// which produce shortest round-trippable representations.
     /// Returns `nil` if the value is neither numeric nor raw.
     @inline(__always)
     func yyNumberText(_ val: UnsafeMutablePointer<yyjson_val>) -> String? {
@@ -68,8 +68,8 @@ import Foundation
         return yyjson_is_num(val) || yyjson_is_raw(val)
     }
 
-    /// Returns a short human-readable name for `val`'s JSON type, used in
-    /// `YYJSONError.typeMismatch` diagnostics.
+    /// Returns a short human-readable name for `val`'s JSON type,
+    /// used in `YYJSONError.typeMismatch` diagnostics.
     @inline(__always)
     func yyTypeString(_ val: UnsafeMutablePointer<yyjson_val>) -> String {
         switch yyjson_get_type(val) {
@@ -119,10 +119,10 @@ import Foundation
     /// Parses a numeric JSON value as `Double` without allocating an intermediate `String`.
     ///
     /// For raw values (the common path under `YYJSON_READ_NUMBER_AS_RAW`),
-    /// `strtoll`/`strtoull` are tried first with base 0 so JSON5 hex literals
-    /// (`0xFF`) preserved as raw text are admitted as `Double`-convertible
-    /// integers; `strtod` handles the remaining fractional, exponential, and
-    /// non-finite (`Infinity`/`NaN`) forms. For values stored natively,
+    /// `strtoll`/`strtoull` are tried first with base 0
+    /// so JSON5 hex literals (`0xFF`) preserved as raw text are admitted as `Double`-convertible integers;
+    /// `strtod` handles the remaining fractional, exponential, and non-finite (`Infinity`/`NaN`) forms.
+    /// For values stored natively,
     /// `yyjson_get_num` returns the parsed result.
     @inline(__always)
     func yyParseDouble(_ val: UnsafeMutablePointer<yyjson_val>) -> Double? {
@@ -156,13 +156,13 @@ import Foundation
 
     /// Parses a numeric JSON value as a fixed-width signed integer.
     ///
-    /// Tries `strtoll` first for plain integer text (auto-detecting `0x` hex
-    /// literals admitted by JSON5's extended-number mode); falls back to a
-    /// `Double` conversion for fractional or exponential forms, and for integers
-    /// that overflow `Int64`. Range checking uses `T(exactly:)` against the
-    /// truncated `Double` to avoid the rounding pitfalls of comparing against
-    /// `Double(T.min)`/`Double(T.max)`, which are not exactly representable for
-    /// 64-bit integer bounds.
+    /// Tries `strtoll` first for plain integer text
+    /// (auto-detecting `0x` hex literals admitted by JSON5's extended-number mode);
+    /// falls back to a `Double` conversion for fractional or exponential forms,
+    /// and for integers that overflow `Int64`.
+    /// Range checking uses `T(exactly:)` against the truncated `Double`
+    /// to avoid the rounding pitfalls of comparing against `Double(T.min)`/`Double(T.max)`,
+    /// which are not exactly representable for 64-bit integer bounds.
     @inline(__always)
     func yyParseSignedInt<T: FixedWidthInteger & SignedInteger>(
         _ val: UnsafeMutablePointer<yyjson_val>
@@ -194,12 +194,12 @@ import Foundation
 
     /// Parses a numeric JSON value as a fixed-width unsigned integer.
     ///
-    /// Tries `strtoull` first for plain integer text (auto-detecting `0x` hex
-    /// literals admitted by JSON5's extended-number mode); falls back to a
-    /// `Double` conversion for fractional or exponential forms, and for integers
-    /// that overflow `UInt64`. Range checking uses `T(exactly:)` against the
-    /// truncated `Double` to avoid the rounding pitfalls of comparing against
-    /// `Double(T.max)` for 64-bit unsigned bounds.
+    /// Tries `strtoull` first for plain integer text
+    /// (auto-detecting `0x` hex literals admitted by JSON5's extended-number mode);
+    /// falls back to a `Double` conversion for fractional or exponential forms,
+    /// and for integers that overflow `UInt64`.
+    /// Range checking uses `T(exactly:)` against the truncated `Double`
+    /// to avoid the rounding pitfalls of comparing against `Double(T.max)` for 64-bit unsigned bounds.
     @inline(__always)
     func yyParseUnsignedInt<T: FixedWidthInteger & UnsignedInteger>(
         _ val: UnsafeMutablePointer<yyjson_val>
@@ -296,11 +296,11 @@ import Foundation
             #if !YYJSON_DISABLE_NON_STANDARD
                 options.formUnion(allowsJSON5.readOptions)
             #endif
-            // The `.lossless` strategy preserves the original text of every JSON
-            // number so that high-precision types like `Decimal` can be decoded
-            // exactly. `.fast` lets yyjson parse numbers as `Int64`/`UInt64`/`Double`
-            // natively, restoring the library's native throughput at the cost of
-            // fractional `Decimal` precision and very large integer range.
+            // The `.lossless` strategy preserves the original text of every JSON number
+            // so that high-precision types like `Decimal` can be decoded exactly.
+            // `.fast` lets yyjson parse numbers as `Int64`/`UInt64`/`Double` natively,
+            // restoring the library's native throughput
+            // at the cost of fractional `Decimal` precision and very large integer range.
             if numberDecodingStrategy == .lossless {
                 options.insert(.numberAsRaw)
             }
@@ -475,8 +475,8 @@ import Foundation
     /// The strategies for decoding JSON numbers,
     /// trading exact precision for throughput.
     public enum NumberDecodingStrategy: Sendable {
-        /// Reads every JSON number's original input text and parses it directly into
-        /// the requested Swift type.
+        /// Reads every JSON number's original input text
+        /// and parses it directly into the requested Swift type.
         ///
         /// Required for lossless `Decimal` decoding
         /// (including fractional values like `0.1` and integers beyond `UInt64`).
@@ -486,14 +486,13 @@ import Foundation
         /// Reads numbers using yyjson's native `Int64`/`UInt64`/`Double` parsers.
         ///
         /// Recovers the library's native throughput for number-heavy payloads,
-        /// at the cost of precision: every numeric value is routed through
-        /// `Double` before being handed to Swift, so
+        /// at the cost of precision:
+        /// every numeric value is routed through `Double` before being handed to Swift, so
         ///
         /// - Fractional values decoded as `Decimal` may not round-trip exactly
         ///   (e.g. `0.1` decodes as `Decimal(0.1000000000000000055...)`).
-        /// - Integer literals outside the `Int64`/`UInt64` range are parsed as
-        ///   `Double` and decode into `Decimal` with `Double` precision rather
-        ///   than preserving every digit.
+        /// - Integer literals outside the `Int64`/`UInt64` range are parsed as `Double`
+        ///   and decode into `Decimal` with `Double` precision rather than preserving every digit.
         ///
         /// Choose this when you control the data shape
         /// and know it doesn't contain high-precision decimals or arbitrary-precision integers.

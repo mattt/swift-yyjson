@@ -5,9 +5,10 @@ import Foundation
 
     // MARK: - Helper Functions
 
-    /// Locale used to format `Decimal` values as JSON numbers. JSON numbers must
-    /// use `.` as the decimal separator, so we pin formatting to POSIX to avoid
-    /// emitting invalid JSON under locales (e.g. de_DE) that use `,`.
+    /// Locale used to format `Decimal` values as JSON numbers.
+    /// JSON numbers must use `.` as the decimal separator,
+    /// so we pin formatting to POSIX to avoid emitting invalid JSON
+    /// under locales (e.g. de_DE) that use `,`.
     private let yyPOSIXLocale = Locale(identifier: "en_US_POSIX")
 
     @inline(__always)
@@ -221,10 +222,10 @@ import Foundation
                     path: codingPath.map { $0.stringValue }.joined(separator: ".")
                 )
             }
-            // `Decimal.description` formats with the user's current locale, which
-            // can produce a `,` decimal separator and emit invalid JSON. Render
-            // through `NSDecimalNumber.description(withLocale:)` with POSIX so
-            // the output is always JSON-conformant.
+            // `Decimal.description` formats with the user's current locale,
+            // which can produce a `,` decimal separator and emit invalid JSON.
+            // Render through `NSDecimalNumber.description(withLocale:)` with POSIX
+            // so the output is always JSON-conformant.
             var string = NSDecimalNumber(decimal: value).description(withLocale: yyPOSIXLocale)
             return string.withUTF8 { buf in
                 guard let ptr = buf.baseAddress else {

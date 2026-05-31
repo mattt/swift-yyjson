@@ -134,10 +134,10 @@ import Testing
             }
 
             @Test func readJSON5HexLiteralAsInteger() throws {
-                // `YYJSONSerialization` always reads numbers as raw text, so a
-                // JSON5 hex literal arrives as `"0xFF"` and must round-trip as
-                // an integer-valued `NSNumber` rather than falling through to
-                // `NSNull` (which is what `Int64("0xFF")` would do).
+                // `YYJSONSerialization` always reads numbers as raw text,
+                // so a JSON5 hex literal arrives as `"0xFF"`
+                // and must round-trip as an integer-valued `NSNumber`
+                // rather than falling through to `NSNull` (which is what `Int64("0xFF")` would do).
                 let json = #"{"hex": 0xFF}"#
                 let data = json.data(using: .utf8)!
                 let result =
@@ -173,9 +173,9 @@ import Testing
         }
 
         @Test func fractionalDecodingPreservesPrecisionAcrossIncrements() throws {
-            // Format Decimals with a fixed POSIX locale so the generated JSON
-            // always uses `.` as the decimal separator regardless of the host's
-            // user locale.
+            // Format Decimals with a fixed POSIX locale
+            // so the generated JSON always uses `.` as the decimal separator
+            // regardless of the host's user locale.
             let posix = Locale(identifier: "en_US_POSIX")
             var expected = Decimal(string: "0.00")!
             let step = Decimal(string: "0.01")!
@@ -184,9 +184,9 @@ import Testing
                 let json = "{\"v\":\(text)}"
                 let data = json.data(using: .utf8)!
                 let result = try YYJSONSerialization.jsonObject(with: data) as? NSDictionary
-                // Whole-number values come back as integer-typed NSNumber; fractional
-                // values come back as NSDecimalNumber. Both bridge to NSNumber, whose
-                // `decimalValue` recovers the original Decimal losslessly.
+                // Whole-number values come back as integer-typed NSNumber;
+                // fractional values come back as NSDecimalNumber.
+                // Both bridge to NSNumber, whose `decimalValue` recovers the original Decimal losslessly.
                 #expect((result?["v"] as? NSNumber)?.decimalValue == expected)
                 expected += step
             }

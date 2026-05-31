@@ -957,7 +957,8 @@ import Testing
 
         @Test func decodeDecimalOverflowingDecimalRangeThrows() throws {
             // 1e200 fits in Double but exceeds Decimal's exponent range (-128...127),
-            // so `Decimal(string:)` returns nil and we surface a clear error.
+            // so `Decimal(string:)` returns nil
+            // and we surface a clear error.
             let json = #"{"value": 1e200}"#
             let data = json.data(using: .utf8)!
             #expect(throws: YYJSONError.self) {
@@ -966,8 +967,8 @@ import Testing
         }
 
         @Test func decodeDecimalUnderflowingDecimalRangeThrows() throws {
-            // 1e-200 is non-zero in Double but below Decimal's smallest representable
-            // magnitude, so `Decimal(string:)` returns nil.
+            // 1e-200 is non-zero in Double but below Decimal's smallest representable magnitude,
+            // so `Decimal(string:)` returns nil.
             let json = #"{"value": 1e-200}"#
             let data = json.data(using: .utf8)!
             #expect(throws: YYJSONError.self) {
@@ -987,8 +988,8 @@ import Testing
 
         @Test func decodeDecimalUnderflowingDecimalThrows() throws {
             // 1e-500 is below Decimal's smallest representable magnitude.
-            // The decoder parses the raw text directly rather than collapsing
-            // to zero through a Double conversion, so we surface a clear error.
+            // The decoder parses the raw text directly rather than collapsing to zero through a Double conversion,
+            // so we surface a clear error.
             let json = #"{"value": 1e-500}"#
             let data = json.data(using: .utf8)!
             #expect(throws: YYJSONError.self) {
@@ -997,8 +998,8 @@ import Testing
         }
 
         @Test func decodeIntegerExceedingUInt64MaxPreservesPrecision() throws {
-            // The decoder reads numbers as raw text, so 20+ digit integers that
-            // exceed UInt64 still decode losslessly into Decimal.
+            // The decoder reads numbers as raw text,
+            // so 20+ digit integers that exceed UInt64 still decode losslessly into Decimal.
             let json = #"{"value": 99999999999999999999}"#
             let data = json.data(using: .utf8)!
             let result = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
@@ -1006,8 +1007,8 @@ import Testing
         }
 
         @Test func decodeDecimalPreservesPrecisionBeyondDouble() throws {
-            // The decoder bypasses Double entirely for Decimal, so fractional
-            // values with more than Double's ~17 significant digits decode exactly.
+            // The decoder bypasses Double entirely for Decimal,
+            // so fractional values with more than Double's ~17 significant digits decode exactly.
             let json = #"{"value": 0.12345678901234567890123456789012345678}"#
             let data = json.data(using: .utf8)!
             let result = try YYJSONDecoder().decode(DecimalContainer.self, from: data)
@@ -1412,8 +1413,8 @@ import Testing
 
         @Test func fastModeLosesFractionalDecimalPrecision() throws {
             // A value with more significant digits than `Double` can hold.
-            // `.lossless` parses the original text directly; `.fast` routes through
-            // `Double` and recovers only ~17 significant digits.
+            // `.lossless` parses the original text directly;
+            // `.fast` routes through `Double` and recovers only ~17 significant digits.
             let json = #"{"value": 1.234567890123456789012345}"#
             let data = Data(json.utf8)
             var fast = YYJSONDecoder()
@@ -1427,9 +1428,9 @@ import Testing
         }
 
         @Test func fastModeLosesPrecisionForIntegersBeyondUInt64() throws {
-            // 22-digit integer is well beyond UInt64.max. `.lossless` decodes it
-            // into Decimal exactly; `.fast` parses it as `Double` and the original
-            // digits are clipped to Double's precision.
+            // 22-digit integer is well beyond UInt64.max.
+            // `.lossless` decodes it into Decimal exactly;
+            // `.fast` parses it as `Double` and the original digits are clipped to Double's precision.
             let json = #"{"value": 1234567890123456789012}"#
             let data = Data(json.utf8)
             var fast = YYJSONDecoder()

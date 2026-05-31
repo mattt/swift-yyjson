@@ -3,9 +3,9 @@ import Foundation
 
 #if !YYJSON_DISABLE_READER
 
-    /// Locale used to parse JSON numbers into `Decimal`. JSON numbers always use
-    /// `.` as the decimal separator regardless of the host's user locale, so we
-    /// pin parsing to POSIX to avoid mis-decoding under locales that use `,`.
+    /// Locale used to parse JSON numbers into `Decimal`.
+    /// JSON numbers always use `.` as the decimal separator,
+    /// so we pin parsing to POSIX to avoid mis-decoding under locales that use `,`.
     private let yyPOSIXLocale = Locale(identifier: "en_US_POSIX")
 
     /// Returns the verbatim text of a `YYJSON_TYPE_RAW` value
@@ -371,10 +371,9 @@ import Foundation
 
         /// The number value, or `nil` if not a number.
         ///
-        /// Raw numeric text (parsed under `YYJSONReadOptions.numberAsRaw` or
-        /// `bigNumberAsRaw`) is run through the same `strtoll`/`strtoull`/
-        /// `strtod` pipeline the decoder uses, so JSON5 extras like hex
-        /// literals (`0xFF`) and non-finite spellings (`Infinity`, `NaN`)
+        /// Raw numeric text (parsed under `YYJSONReadOptions.numberAsRaw` or `bigNumberAsRaw`)
+        /// is run through the same `strtoll`/`strtoull`/`strtod` pipeline the decoder uses,
+        /// so JSON5 extras like hex literals (`0xFF`) and non-finite spellings (`Infinity`, `NaN`)
         /// surface here as `Double` instead of returning `nil`.
         public var number: Double? {
             switch storage {

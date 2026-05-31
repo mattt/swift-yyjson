@@ -374,8 +374,9 @@ import Testing
 
         @Test func decimalFromFractionWithoutRawIsApproximate() throws {
             let value = try YYJSONValue(string: "0.1")
-            // Without `.numberAsRaw`, the value passes through `Double` so the
-            // returned `Decimal` reflects the closest binary representation.
+            // Without `.numberAsRaw`,
+            // the value passes through `Double`,
+            // so the returned `Decimal` reflects the closest binary representation.
             let approximate = value.decimal
             #expect(approximate != nil)
             #expect(abs((approximate! as NSDecimalNumber).doubleValue - 0.1) < 1e-9)
@@ -387,9 +388,9 @@ import Testing
         }
 
         @Test func decimalPreservesPrecisionAcrossIncrements() throws {
-            // Format Decimals with a fixed POSIX locale so the generated JSON
-            // text always uses `.` as the decimal separator regardless of the
-            // host's user locale.
+            // Format Decimals with a fixed POSIX locale
+            // so the generated JSON text always uses `.` as the decimal separator
+            // regardless of the host's user locale.
             let posix = Locale(identifier: "en_US_POSIX")
             var expected = Decimal(string: "0.00")!
             let step = Decimal(string: "0.01")!
@@ -416,10 +417,9 @@ import Testing
         #if !YYJSON_DISABLE_NON_STANDARD
 
             @Test func numberParsesJSON5HexFromRawText() throws {
-                // With `.numberAsRaw` + `.allowExtendedNumbers`, hex literals are
-                // preserved as raw text. `.number` must route through the C
-                // integer fast path (base 0) so the hex value still surfaces as
-                // a `Double` instead of returning `nil`.
+                // With `.numberAsRaw` + `.allowExtendedNumbers`, hex literals are preserved as raw text.
+                // `.number` must route through the C integer fast path (base 0)
+                // so the hex value still surfaces as a `Double` instead of returning `nil`.
                 let value = try YYJSONValue(
                     string: "0xFF",
                     options: [.numberAsRaw, .allowExtendedNumbers]
