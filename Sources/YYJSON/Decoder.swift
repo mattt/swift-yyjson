@@ -472,9 +472,9 @@ import Foundation
 
         /// Reads numbers using yyjson's native `Int64`/`UInt64`/`Double` parsers.
         ///
-        /// Recovers the library's native throughput for number-heavy payloads,
-        /// at the cost of precision:
-        /// every numeric value is routed through `Double` before being handed to Swift, so
+        /// Recovers yyjson's native throughput for number-heavy payloads,
+        /// at the cost of precision.
+        /// Every numeric value passes through `Double` before reaching Swift, so:
         ///
         /// - Fractional values decoded as `Decimal` may not round-trip exactly
         ///   (e.g. `0.1` decodes as `Decimal(0.1000000000000000055...)`).
