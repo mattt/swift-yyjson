@@ -9,11 +9,6 @@ import Foundation
     import Musl
 #endif
 
-/// Locale used to parse JSON numbers into `Decimal`.
-/// JSON numbers always use `.` as the decimal separator,
-/// so we pin parsing to POSIX to avoid mis-decoding under locales that use `,`.
-private let yyPOSIXLocale = Locale(identifier: "en_US_POSIX")
-
 #if !YYJSON_DISABLE_READER
 
     /// Parses a JSON numeric literal as a fixed-width integer.

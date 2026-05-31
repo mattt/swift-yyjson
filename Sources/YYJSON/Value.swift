@@ -3,11 +3,6 @@ import Foundation
 
 #if !YYJSON_DISABLE_READER
 
-    /// Locale used to parse JSON numbers into `Decimal`.
-    /// JSON numbers always use `.` as the decimal separator,
-    /// so we pin parsing to POSIX to avoid mis-decoding under locales that use `,`.
-    private let yyPOSIXLocale = Locale(identifier: "en_US_POSIX")
-
     /// Returns the verbatim text of a `YYJSON_TYPE_RAW` value
     /// (numbers preserved via `YYJSON_READ_NUMBER_AS_RAW` or `YYJSON_READ_BIGNUM_AS_RAW`).
     @inline(__always)

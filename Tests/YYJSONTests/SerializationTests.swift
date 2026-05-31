@@ -173,14 +173,10 @@ import Testing
         }
 
         @Test func fractionalDecodingPreservesPrecisionAcrossIncrements() throws {
-            // Format Decimals with a fixed POSIX locale
-            // so the generated JSON always uses `.` as the decimal separator
-            // regardless of the host's user locale.
-            let posix = Locale(identifier: "en_US_POSIX")
             var expected = Decimal(string: "0.00")!
             let step = Decimal(string: "0.01")!
             while expected <= Decimal(string: "1.00")! {
-                let text = NSDecimalNumber(decimal: expected).description(withLocale: posix)
+                let text = NSDecimalNumber(decimal: expected).description(withLocale: yyPOSIXLocale)
                 let json = "{\"v\":\(text)}"
                 let data = json.data(using: .utf8)!
                 let result = try YYJSONSerialization.jsonObject(with: data) as? NSDictionary

@@ -706,15 +706,11 @@ import Testing
 
         @Test func decodeDecimalPreservesPrecisionAcrossIncrements() throws {
             let decoder = YYJSONDecoder()
-            // Format Decimals with a fixed POSIX locale
-            // so the generated JSON always uses `.` as the decimal separator
-            // (otherwise locales like de_DE would produce `0,01` and fail to parse as JSON)
-            let posix = Locale(identifier: "en_US_POSIX")
             var decimal = Decimal(string: "0.00")!
             let limit = Decimal(string: "99.99")!
             let step = Decimal(string: "0.01")!
             while decimal <= limit {
-                let text = NSDecimalNumber(decimal: decimal).description(withLocale: posix)
+                let text = NSDecimalNumber(decimal: decimal).description(withLocale: yyPOSIXLocale)
                 let jsonData = Data("{\"value\":\(text)}".utf8)
                 let result = try decoder.decode(DecimalContainer.self, from: jsonData)
                 #expect(result.value == decimal)

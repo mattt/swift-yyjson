@@ -5,12 +5,6 @@ import Foundation
 
     // MARK: - Helper Functions
 
-    /// Locale used to format `Decimal` values as JSON numbers.
-    /// JSON numbers must use `.` as the decimal separator,
-    /// so we pin formatting to POSIX to avoid emitting invalid JSON
-    /// under locales (e.g. de_DE) that use `,`.
-    private let yyPOSIXLocale = Locale(identifier: "en_US_POSIX")
-
     @inline(__always)
     func yyFromString(_ string: String, in doc: UnsafeMutablePointer<yyjson_mut_doc>) -> UnsafeMutablePointer<
         yyjson_mut_val

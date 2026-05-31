@@ -1,4 +1,10 @@
 import Cyyjson
+import Foundation
+
+/// Locale used to parse and format JSON numbers as `Decimal`.
+/// JSON numbers always use `.` as the decimal separator,
+/// so we pin to POSIX to avoid mis-handling under locales that use `,`.
+let yyPOSIXLocale = Locale(identifier: "en_US_POSIX")
 
 #if !YYJSON_DISABLE_WRITER
 

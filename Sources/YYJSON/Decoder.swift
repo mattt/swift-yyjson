@@ -13,11 +13,6 @@ import Foundation
 
     // MARK: - Helper Functions
 
-    /// Locale used to parse JSON numbers into `Decimal`.
-    /// JSON numbers always use `.` as the decimal separator,
-    /// so we pin parsing to POSIX to avoid mis-decoding under locales that use `,`.
-    private let yyPOSIXLocale = Locale(identifier: "en_US_POSIX")
-
     @inline(__always)
     func yyToString(_ val: UnsafeMutablePointer<yyjson_val>) -> String {
         let ptr = unsafe_yyjson_get_str(val)!
