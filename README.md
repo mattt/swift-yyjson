@@ -261,6 +261,49 @@ if let name = value["users"]?[0]?["name"]?.string {
 }
 ```
 
+### Number Precision
+
+By default, `YYJSONDecoder` decodes numbers losslessly.
+Each number is read as its original text and parsed directly into the
+requested Swift type, so values round-trip exactly —
+including fractional `Decimal` values like `0.1` and integers larger than `UInt64`.
+This matches the precision contract of Foundation's `JSONDecoder`.
+
+```swift
+struct Account: Codable {
+    let balance: Decimal
+}
+
+let data = Data(#"{"balance": 9999999999999999.99}"#.utf8)
+let account = try YYJSONDecoder().decode(Account.self, from: data)
+print(account.balance) // 9999999999999999.99 (no precision loss)
+```
+
+If you don't need exact decimals and want maximum throughput on number-heavy payloads,
+opt into the faster (but lossy) strategy,
+which routes every number through `Double`:
+
+```swift
+var decoder = YYJSONDecoder()
+decoder.numberDecodingStrategy = .fast
+```
+
+`YYJSONEncoder` writes `Decimal` values from their exact text
+rather than going through `Double`,
+so encoded decimals preserve full precision regardless of the host locale.
+
+For DOM-style access, parse with `.numberAsRaw`
+and read the `decimal` property to recover the exact value:
+
+```swift
+let value = try YYJSONValue(string: #"{"price": 19.99}"#, options: .numberAsRaw)
+print(value["price"]?.decimal) // Optional(19.99)
+```
+
+The `number` property returns a `Double` for convenience.
+`YYJSONSerialization` likewise preserves precision, bridging fractional
+and oversized integer values to `NSDecimalNumber`.
+
 ### In-Place Parsing
 
 For maximum performance with large JSON files,
@@ -502,8 +545,9 @@ However, there are some differences:
   `keyEncodingStrategy` or `nonConformingFloatEncodingStrategy`
 
 - **Output formatting**: Uses `writeOptions` instead of `outputFormatting`
-- **Number precision**: yyjson parses numbers as 64-bit integers or doubles;
-  extremely large integers may lose precision
+- **Number precision**: `YYJSONDecoder` decodes numbers losslessly by default, matching `JSONDecoder`.
+  Opt into the faster, `Double`-based strategy with `numberDecodingStrategy = .fast`
+  (see [Number Precision](#number-precision)).
 
 ## Thread Safety
 
@@ -511,8 +555,9 @@ However, there are some differences:
   multiple threads, as long as each `encode`/`decode` call is not shared concurrently.
 - `YYJSONValue`, `YYJSONObject`, and `YYJSONArray` are safe to share across threads
   for read-only access; they wrap an immutable yyjson document.
-- The `number` property on `YYJSONValue` returns a `Double`. For exact representation
-  of very large numbers, parse using `.bigNumberAsRaw` and read them as strings.
+- The `number` property on `YYJSONValue` returns a `Double`.
+  For exact representation, parse using `.numberAsRaw` (or `.bigNumberAsRaw`)
+  and read the `decimal` property.
 
 ## License
 
