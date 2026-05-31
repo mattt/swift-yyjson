@@ -1,6 +1,12 @@
 import Cyyjson
 import Foundation
 
+#if canImport(Darwin)
+    import Darwin
+#elseif canImport(Glibc)
+    import Glibc
+#endif
+
 /// Locale used to parse JSON numbers into `Decimal`. JSON numbers always use
 /// `.` as the decimal separator regardless of the host's user locale, so we
 /// pin parsing to POSIX to avoid mis-decoding under locales that use `,`.
