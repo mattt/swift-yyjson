@@ -9,7 +9,7 @@ on:
 jobs:
   test-macos:
     name: "Swift ${{ matrix.swift }} on macOS"
-    runs-on: macos-${{ matrix.macos }}
+    runs-on: ${{ matrix.runner }}
     env:
       DEVELOPER_DIR: "/Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer"
     strategy:
@@ -18,10 +18,16 @@ jobs:
         include:
           - swift: "6.1"
             xcode: "16.3"
-            macos: "15"
+            runner: macos-15
           - swift: "6.2"
             xcode: "26.0"
-            macos: "26"
+            runner: macos-26
+          - swift: "6.3"
+            xcode: "26.6"
+            runner: macos-26
+          - swift: "6.4"
+            xcode: "27.0"
+            runner: xcode-27
     timeout-minutes: 10
     steps:
       - name: Checkout code
@@ -83,20 +89,17 @@ jobs:
   test-linux:
     name: "Swift ${{ matrix.swift-version }} on Linux"
     runs-on: ubuntu-latest
+    container: swift:${{ matrix.swift-version }}-noble
     strategy:
       fail-fast: false
       matrix:
         swift-version:
           - "6.1"
+          - "6.4"
     timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-
-      - name: Setup Swift
-        uses: vapor/swiftly-action@v0.2
-        with:
-          toolchain: ${{ matrix.swift-version }}
 
       - name: Lint
         run: swift format lint --strict --recursive .
@@ -110,6 +113,7 @@ jobs:
   test-linux-traits:
     name: "Swift 6.1 on Linux with trait ${{ matrix.trait }}"
     runs-on: ubuntu-latest
+    container: swift:6.1-noble
     strategy:
       fail-fast: false
       matrix:
@@ -125,11 +129,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-
-      - name: Setup Swift
-        uses: vapor/swiftly-action@v0.2
-        with:
-          toolchain: "6.1"
 
       - name: Build
         run: swift build --traits ${{ matrix.trait }}
