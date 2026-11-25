@@ -8,6 +8,17 @@ let yyPOSIXLocale = Locale(identifier: "en_US_POSIX")
 
 #if !YYJSON_DISABLE_WRITER
 
+    /// Copies a finite decimal into the document as a JSON number.
+    func yyFromFiniteDecimal(_ value: Decimal, in doc: UnsafeMutablePointer<yyjson_mut_doc>) throws
+        -> UnsafeMutablePointer<yyjson_mut_val>
+    {
+        let literal = NSDecimalNumber(decimal: value).description(withLocale: yyPOSIXLocale)
+        guard let number = yyjson_mut_rawcpy(doc, literal) else {
+            throw YYJSONError.invalidData("Failed to create decimal number")
+        }
+        return number
+    }
+
     /// Recursively sort object keys in-place using UTF-8 lexicographical comparison (strcmp).
     /// This matches Apple's JSONEncoder behavior for typical keys, but embedded null bytes
     /// may compare differently due to C string semantics.

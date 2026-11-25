@@ -857,6 +857,16 @@ struct SerializationValidationTests {
 
     @Suite("YYJSONSerialization - Roundtrip")
     struct SerializationRoundtripTests {
+        @Test(arguments: ["9007199254740993", "0.12345678901234567890123456789012345678"])
+        func roundtripDecimalNumber(_ literal: String) throws {
+            let number = NSDecimalNumber(string: literal, locale: yyPOSIXLocale)
+            let data = try YYJSONSerialization.data(withJSONObject: [number])
+            #expect(String(decoding: data, as: UTF8.self) == "[\(literal)]")
+
+            let decoded = try YYJSONSerialization.jsonObject(with: data) as? [NSNumber]
+            #expect(decoded?.first?.stringValue == literal)
+        }
+
         @Test func roundtripDictionary() throws {
             let original: NSDictionary = [
                 "string": "hello",
@@ -917,6 +927,23 @@ struct SerializationValidationTests {
 
     @Suite("YYJSONSerialization - Number Types")
     struct SerializationNumberTests {
+        @Test func writeDecimalNaN() throws {
+            let values = [NSDecimalNumber.notANumber]
+            #expect(!YYJSONSerialization.isValidJSONObject(values))
+            #expect(throws: YYJSONError.self) {
+                try YYJSONSerialization.data(withJSONObject: values)
+            }
+            #if !YYJSON_DISABLE_NON_STANDARD
+                let literal = try YYJSONSerialization.data(withJSONObject: values, options: .allowInfAndNaN)
+                #expect(String(decoding: literal, as: UTF8.self) == "[NaN]")
+                let null = try YYJSONSerialization.data(
+                    withJSONObject: values,
+                    options: [.allowInfAndNaN, .infAndNaNAsNull]
+                )
+                #expect(String(decoding: null, as: UTF8.self) == "[null]")
+            #endif
+        }
+
         @Test func writeSignedIntegers() throws {
             let dict: NSDictionary = [
                 "int8": NSNumber(value: Int8(-128)),

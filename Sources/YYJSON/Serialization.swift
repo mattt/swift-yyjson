@@ -296,12 +296,6 @@ public enum YYJSONSerialization {
                 guard key is NSString else {
                     return false
                 }
-                if let number = value as? NSNumber {
-                    let doubleValue = number.doubleValue
-                    if !allowNonFiniteNumbers && (doubleValue.isNaN || doubleValue.isInfinite) {
-                        return false
-                    }
-                }
                 if !isValidJSONObjectRecursive(value, allowNonFiniteNumbers: allowNonFiniteNumbers) {
                     return false
                 }
@@ -310,19 +304,19 @@ public enum YYJSONSerialization {
 
         case let arr as NSArray:
             for element in arr {
-                if let number = element as? NSNumber {
-                    let doubleValue = number.doubleValue
-                    if !allowNonFiniteNumbers && (doubleValue.isNaN || doubleValue.isInfinite) {
-                        return false
-                    }
-                }
                 if !isValidJSONObjectRecursive(element, allowNonFiniteNumbers: allowNonFiniteNumbers) {
                     return false
                 }
             }
             return true
 
-        case is NSString, is NSNumber, is NSNull:
+        case let decimal as NSDecimalNumber:
+            return allowNonFiniteNumbers || !decimal.decimalValue.isNaN
+
+        case let number as NSNumber:
+            return allowNonFiniteNumbers || number.doubleValue.isFinite
+
+        case is NSString, is NSNull:
             return true
 
         default:
@@ -388,6 +382,9 @@ public enum YYJSONSerialization {
             switch obj {
             case let str as NSString:
                 return yyFromString(str as String, in: doc)
+
+            case let decimal as NSDecimalNumber where !decimal.decimalValue.isNaN:
+                return try yyFromFiniteDecimal(decimal.decimalValue, in: doc)
 
             case let num as NSNumber:
                 let doubleValue = num.doubleValue
