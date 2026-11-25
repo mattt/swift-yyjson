@@ -216,17 +216,7 @@ import Foundation
                     path: codingPath.map { $0.stringValue }.joined(separator: ".")
                 )
             }
-            // `Decimal.description` formats with the user's current locale,
-            // which can produce a `,` decimal separator and emit invalid JSON.
-            // Render through `NSDecimalNumber.description(withLocale:)` with POSIX
-            // so the output is always JSON-conformant.
-            var string = NSDecimalNumber(decimal: value).description(withLocale: yyPOSIXLocale)
-            return string.withUTF8 { buf in
-                guard let ptr = buf.baseAddress else {
-                    return yyjson_mut_rawncpy(doc, "0", 1)
-                }
-                return yyjson_mut_rawncpy(doc, ptr, buf.count)
-            }
+            return try yyFromFiniteDecimal(value, in: doc)
         }
     }
 
